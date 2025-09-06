@@ -10,12 +10,10 @@ def listar_propiedades_disponibles():
     """
     ruta_conocimiento = "./conocimiento"
     try:
-        # Lista todos los archivos en la carpeta que terminan en .txt
         archivos = [f for f in os.listdir(ruta_conocimiento) if f.endswith('.txt')]
         if not archivos:
             return "No se encontraron propiedades en la base de datos."
         
-        # Formatea la lista para que sea más legible
         lista_formateada = "\n- ".join(archivos)
         return f"Actualmente, estas son las propiedades en cartera:\n- {lista_formateada}"
         
