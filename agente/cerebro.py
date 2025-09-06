@@ -1,99 +1,120 @@
-# agente/cerebro.py
-
 import os
 from dotenv import load_dotenv
 
-# Importaciones de LangChain
-from langchain_openai import ChatOpenAI
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.memory import ConversationBufferMemory
-from langchain.chains import create_history_aware_retriever, create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
-
-# Importaciones para la base de conocimiento (RAG)
+# --- Importaciones de LangChain (Cambiamos el modelo de embeddings) ---
+from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.prompts import ChatPromptTemplate
+from langchain.memory import ConversationBufferMemory
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.tools.retrieval import create_retrieval_tool
 
-# Importaciones para las herramientas del agente
-from langchain.agents import create_tool_calling_agent, AgentExecutor
-from . import herramientas
+# --- Importación de las Herramientas Personalizadas ---
+from agente.herramientas import listar_propiedades_disponibles
 
 # --- Variables Globales ---
 agente_executor = None
 conversaciones = {}
 
-# --- Función de Inicialización Principal ---
+# --- Plantilla de Sistema para la Personalidad del Agente ---
+system_template = """
+Eres 'Álex', un experto y amable asistente inmobiliario para "Inmobiliaria Terramagna".
+Tu objetivo es ayudar a los clientes a encontrar la propiedad perfecta.
+Eres multilingüe y debes responder siempre en el mismo idioma en el que te pregunta el cliente (español, inglés o alemán).
+
+Reglas de comportamiento:
+1.  Usa SIEMPRE tus herramientas para responder a las preguntas.
+2.  Para preguntas generales sobre la cartera ("qué tienes", "muéstrame villas", etc.), usa la herramienta 'listar_propiedades_disponibles'.
+3.  Para preguntas específicas sobre una propiedad, usa la herramienta 'busqueda_de_propiedades'.
+4.  Si no encuentras la información exacta en tus herramientas, responde amablemente que no tienes esa información, pero nunca te la inventes.
+5.  Mantén las respuestas concisas y directas al grano.
+"""
+
 def inicializar_agente():
+    """
+    Esta función prepara todo lo necesario para que el agente funcione.
+    Se ejecuta una sola vez al iniciar el servidor.
+    """
     global agente_executor
-    print("Iniciando el Agente de IA Inmobiliario...")
+    print("Iniciando el Agente de IA Inmobiliario (Versión Optimizada)...")
+
+    # 1. Cargar las variables de entorno (API Key de OpenAI)
     load_dotenv()
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("No se encontró la API Key de OpenAI. Asegúrate de que está en el archivo .env")
 
-    # 1. Preparar la Base de Conocimiento (Vectorstore)
+    # 2. Cargar los documentos de la base de conocimiento
     print("Cargando documentos de la base de conocimiento...")
-    loader = DirectoryLoader('./conocimiento/', glob="**/*.txt", loader_cls=TextLoader, loader_kwargs={"encoding": "utf-8"})
+    loader = DirectoryLoader('./conocimiento/', glob="**/*.txt", loader_cls=TextLoader, loader_kwargs={'encoding': 'utf-8'})
     documentos = loader.load()
-
     if not documentos:
         raise ValueError("No se cargaron documentos. Verifica que la carpeta 'conocimiento' no esté vacía y contenga archivos .txt.")
 
-    print("Dividiendo y procesando documentos...")
+    # 3. Dividir los documentos en trozos más pequeños
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     docs_divididos = text_splitter.split_documents(documentos)
-    
-    print("Creando embeddings (representaciones numéricas del texto)...")
-    modelo_embeddings = SentenceTransformerEmbeddings(model_name="all-MiniLM-L6-v2")
-    
-    print("Indexando documentos en la base de datos vectorial...")
-    vectorstore = FAISS.from_documents(docs_divididos, modelo_embeddings)
-    retriever = vectorstore.as_retriever(k=4)
+
+    # 4. Crear los embeddings usando la API de OpenAI (¡Esta es la optimización!)
+    print("Creando embeddings con la API de OpenAI...")
+    # Este objeto no carga un modelo pesado, solo se prepara para llamar a la API de OpenAI.
+    modelo_embeddings = OpenAIEmbeddings(api_key=api_key)
+
+    # 5. Crear la base de datos vectorial e indexar los documentos
+    print("Indexando documentos...")
+    base_de_datos_vectorial = FAISS.from_documents(docs_divididos, modelo_embeddings)
+    retriever = base_de_datos_vectorial.as_retriever(search_kwargs={"k": 3})
     print("✅ Base de conocimiento preparada y cargada.")
 
-    # 2. Definir la Personalidad y las Instrucciones del Agente
-    # ¡AQUÍ ESTÁ LA CORRECCIÓN!
-    system_template = """
-    Eres un experto y amable asistente virtual para 'Inmobiliaria Terramagna'.
-    Tu objetivo es ayudar a los clientes a encontrar información sobre propiedades y resolver sus dudas sobre la empresa.
-    
-    Instrucción Clave: Responde SIEMPRE en el mismo idioma en el que te escribe el cliente. 
-    Puedes comunicarte fluidamente en español, inglés, alemán y ruso.
-    
-    Utiliza las herramientas disponibles para responder a las preguntas. Basa tus respuestas únicamente en la información recuperada de tus herramientas.
-    Sé siempre profesional y servicial.
-    """
-    
-    # 3. Crear el "Cerebro" que usa la memoria y el conocimiento
-    llm = ChatOpenAI(model="gpt-4o", temperature=0)
-    
+    # 6. Definir las herramientas que el agente podrá usar
+    herramienta_busqueda_propiedades = create_retrieval_tool(
+        retriever,
+        "busqueda_de_propiedades",
+        "Busca y devuelve información detallada sobre propiedades inmobiliarias específicas. Úsala cuando te pregunten por características, precios o detalles de una propiedad."
+    )
+    herramienta_listar_propiedades = listar_propiedades_disponibles
+
+    herramientas = [herramienta_busqueda_propiedades, herramienta_listar_propiedades]
+
+    # 7. Crear el cerebro del agente (Modelo de Lenguaje)
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
+
+    # 8. Crear el prompt (las instrucciones del agente)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_template),
-        MessagesPlaceholder(variable_name="chat_history"),
+        ("placeholder", "{chat_history}"),
         ("human", "{input}"),
-        MessagesPlaceholder(variable_name="agent_scratchpad"),
+        ("placeholder", "{agent_scratchpad}"),
     ])
 
-    # 4. Crear las herramientas que el agente puede usar
-    tool_list = [herramientas.listar_propiedades_disponibles, retriever.as_tool()]
-    
-    # 5. Crear el Agente Ejecutor
-    agent = create_tool_calling_agent(llm, tool_list, prompt)
-    agente_executor = AgentExecutor(agent=agent, tools=tool_list, verbose=True)
-    print("✅ Cerebro de 'Inmobiliaria Terramagna' inicializado.")
+    # 9. Construir el agente ejecutor
+    agent = create_tool_calling_agent(llm, herramientas, prompt)
+    agente_executor = AgentExecutor(agent=agent, tools=herramientas, verbose=True)
+    print("✅ Cerebro del agente inmobiliario inicializado.")
 
-# --- Función de Ejecución ---
-def ejecutar_agente(pregunta, session_id):
+def obtener_o_crear_memoria_conversacion(session_id: str):
+    """Gestiona la memoria para cada conversación."""
     if session_id not in conversaciones:
         conversaciones[session_id] = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
-    
-    memoria = conversaciones[session_id]
-    
-    resultado = agente_executor.invoke({
-        "input": pregunta,
-        "chat_history": memoria.chat_memory.messages
-    })
-    
-    memoria.save_context({"input": pregunta}, {"output": resultado["output"]})
-    
-    return resultado["output"]
+    return conversaciones[session_id]
 
+def ejecutar_agente(pregunta: str, session_id: str):
+    """Ejecuta el agente con la pregunta y el historial de conversación."""
+    if not agente_executor:
+        raise RuntimeError("El agente no ha sido inicializado. Llama a 'inicializar_agente()' al iniciar la aplicación.")
+
+    memoria = obtener_o_crear_memoria_conversacion(session_id)
+    historial = memoria.load_memory_variables({})
+
+    respuesta = agente_executor.invoke({
+        "input": pregunta,
+        "chat_history": historial.get("chat_history", [])
+    })
+
+    memoria.save_context({"input": pregunta}, {"output": respuesta["output"]})
+
+    return respuesta["output"]
