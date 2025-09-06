@@ -1,2 +1,0 @@
-Propiedad de prueba.
-Esto es solo para verificar que el sistema arranca.

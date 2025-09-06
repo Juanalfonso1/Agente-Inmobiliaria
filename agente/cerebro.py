@@ -11,7 +11,9 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.prompts import ChatPromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.tools.retrieval import create_retrieval_tool
+# --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
+# La herramienta ya no está en 'langchain.tools.retrieval', ahora está directamente en 'langchain.agents'.
+from langchain.agents import create_retrieval_tool
 
 # --- Importación de las Herramientas Personalizadas ---
 from agente.herramientas import listar_propiedades_disponibles
@@ -43,7 +45,6 @@ def inicializar_agente():
     print("Iniciando el Agente de IA Inmobiliario (Versión Final)...")
 
     # --- CARGA INTELIGENTE DE VARIABLES DE ENTORNO ---
-    # Si no estamos en el entorno de Render, cargamos el archivo .env
     if os.getenv("RENDER") != "true":
         print("Entorno local detectado, cargando archivo .env...")
         load_dotenv()
@@ -52,12 +53,16 @@ def inicializar_agente():
     if not api_key:
         raise ValueError("CRÍTICO: No se encontró la API Key de OpenAI. Verifica la variable de entorno en Render o el archivo .env local.")
 
-    # El resto del código es igual...
     print("Cargando documentos de la base de conocimiento...")
     loader = DirectoryLoader('./conocimiento/', glob="**/*.txt", loader_cls=TextLoader, loader_kwargs={'encoding': 'utf-8'})
     documentos = loader.load()
+    
+    # Creamos las herramientas
+    herramienta_listar_propiedades = listar_propiedades_disponibles
+    herramientas = [herramienta_listar_propiedades]
+
     if not documentos:
-        print("ADVERTENCIA: No se encontraron documentos en la carpeta 'conocimiento'. El agente responderá con conocimiento general.")
+        print("ADVERTENCIA: No se encontraron documentos. La herramienta de búsqueda de propiedades no estará disponible.")
     else:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         docs_divididos = text_splitter.split_documents(documentos)
@@ -75,9 +80,8 @@ def inicializar_agente():
             "busqueda_de_propiedades",
             "Busca y devuelve información detallada sobre propiedades inmobiliarias específicas. Úsala cuando te pregunten por características, precios o detalles de una propiedad."
         )
-    
-    herramienta_listar_propiedades = listar_propiedades_disponibles
-    herramientas = [herramienta_busqueda_propiedades, herramienta_listar_propiedades] if 'herramienta_busqueda_propiedades' in locals() else [herramienta_listar_propiedades]
+        # Añadimos la herramienta de búsqueda a la lista
+        herramientas.append(herramienta_busqueda_propiedades)
 
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=api_key)
 
