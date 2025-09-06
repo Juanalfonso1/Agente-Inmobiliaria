@@ -1,9 +1,8 @@
 fastapi
-uvicorn[standard]
+uvicorn
 python-dotenv
-langchain
-langchain-openai
-langchain-community
+langchain==0.2.1
+langchain-openai==0.1.7
+langchain-community==0.2.1
 faiss-cpu
-pypdf
 tiktoken

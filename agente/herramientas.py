@@ -1,32 +1,25 @@
-# agente/herramientas.py - Aquí definimos las habilidades especiales del agente.
-
 import os
 from langchain.tools import tool
 
 @tool
 def listar_propiedades_disponibles():
     """
-    Útil para obtener una lista de todas las propiedades disponibles en cartera.
-    No recibe ningún argumento.
-    Devuelve un resumen de los inmuebles disponibles.
+    Devuelve una lista con los nombres de archivo de todas las propiedades disponibles.
+    Esta herramienta es útil para responder preguntas generales sobre la cartera,
+    como "¿qué propiedades tienes?" o "¿tienes villas en venta?".
     """
-    print(">>> USANDO HERRAMIENTA: listar_propiedades_disponibles")
-    
-    ruta_conocimiento = './conocimiento'
+    ruta_conocimiento = "./conocimiento"
     try:
-        archivos = os.listdir(ruta_conocimiento)
-        # Filtramos para asegurarnos de que solo cogemos los archivos .txt
-        propiedades_txt = [archivo for archivo in archivos if archivo.endswith('.txt')]
+        # Lista todos los archivos en la carpeta que terminan en .txt
+        archivos = [f for f in os.listdir(ruta_conocimiento) if f.endswith('.txt')]
+        if not archivos:
+            return "No se encontraron propiedades en la base de datos."
         
-        if not propiedades_txt:
-            return "Actualmente no hay ninguna propiedad en la base de datos."
-            
-        # Limpiamos los nombres de los archivos para que sean más legibles
-        nombres_limpios = [nombre.replace('.txt', '').replace('_', ' ') for nombre in propiedades_txt]
+        # Formatea la lista para que sea más legible
+        lista_formateada = "\n- ".join(archivos)
+        return f"Actualmente, estas son las propiedades en cartera:\n- {lista_formateada}"
         
-        return f"Claro, aquí tienes un resumen de las propiedades en cartera:\n- " + "\n- ".join(nombres_limpios)
-
     except FileNotFoundError:
-        return "No se ha encontrado la carpeta de conocimiento. No puedo listar las propiedades."
+        return "Error: La carpeta de conocimiento no fue encontrada."
     except Exception as e:
-        return f"Ha ocurrido un error al intentar listar las propiedades: {e}"
+        return f"Ha ocurrido un error inesperado al listar las propiedades: {e}"

@@ -1,67 +1,54 @@
-# main.py - El servidor que expone nuestro agente al mundo
-
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from contextlib import asynccontextmanager
 import uuid
+from contextlib import asynccontextmanager
 
-# Importamos las funciones clave de nuestro cerebro
-from agente.cerebro import inicializar_agente, ejecutar_agente
+# Importamos las funciones clave de nuestro agente
+from agente.cerebro import inicializar_agente, ejecutar_agente, app_state
 
-# --- Contexto de Vida de la Aplicación ---
+# --- Modelo de Datos para las Peticiones ---
+# Define qué datos esperamos recibir en cada petición
+class PreguntaUsuario(BaseModel):
+    pregunta: str
+    session_id: str | None = None # El session_id es opcional
+
+# --- Función de Arranque y Apagado (Lifespan) ---
+# Esto asegura que el agente se inicialice una sola vez cuando Render arranca el servidor.
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Esta función se ejecuta cuando el servidor arranca.
-    Es el lugar perfecto para inicializar nuestro agente.
-    """
-    print("Iniciando el Agente de IA...")
-    try:
-        inicializar_agente()
-        print("✅ Arranque completado. El agente está listo.")
-    except Exception as e:
-        print(f"❌ Error fatal durante la inicialización: {e}")
+    print("Iniciando servidor...")
+    inicializar_agente()
     yield
-    # Código de limpieza (si fuera necesario al apagar)
     print("Servidor apagado.")
+    # Limpiamos el estado al apagar (buena práctica)
+    app_state.clear()
 
-# --- Inicialización de la App ---
-app = FastAPI(
-    title="Asistente Inmobiliario IA",
-    description="Un agente de IA para interactuar con clientes de una inmobiliaria.",
-    version="1.0.0",
-    lifespan=lifespan
-)
+# --- Creación de la Aplicación FastAPI ---
+app = FastAPI(lifespan=lifespan)
 
-# --- Modelos de Datos (para las peticiones) ---
-class PeticionConversacion(BaseModel):
-    pregunta: str
-    session_id: str | None = None
+# --- Endpoints de la API ---
 
-class RespuestaConversacion(BaseModel):
-    respuesta: str
-    session_id: str
-
-# --- Endpoints (las "puertas" de nuestra API) ---
-@app.get("/")
+@app.get("/", summary="Endpoint de Bienvenida", description="Verifica que el servidor del agente está funcionando.")
 def leer_raiz():
-    return {"mensaje": "¡Bienvenido al Asistente Inmobiliario IA de Gestiones Ficus!"}
+    """Endpoint principal para verificar el estado del servidor."""
+    return {"mensaje": "¡Bienvenido al Agente de IA Inmobiliario! El servidor está funcionando."}
 
-@app.post("/conversar", response_model=RespuestaConversacion)
-def conversar_con_agente(peticion: PeticionConversacion):
+@app.post("/conversar/", summary="Mantener una conversación con el agente", description="Envía una pregunta y un session_id para interactuar con el agente.")
+async def conversar_con_agente(datos_usuario: PreguntaUsuario):
     """
-    Endpoint principal para hablar con el agente.
+    Gestiona una conversación con el agente, usando un session_id
+    para mantener la memoria.
     """
-    session_id = peticion.session_id or str(uuid.uuid4())
-    
-    if not peticion.pregunta:
-        raise HTTPException(status_code=400, detail="La pregunta no puede estar vacía.")
-
     try:
-        # Llamamos a la nueva función del cerebro
-        respuesta_agente = ejecutar_agente(peticion.pregunta, session_id)
-        return RespuestaConversacion(respuesta=respuesta_agente, session_id=session_id)
-    except Exception as e:
-        print(f"Error en el endpoint /conversar: {e}")
-        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {e}")
+        # Si no se proporciona un session_id, creamos uno nuevo.
+        session_id = datos_usuario.session_id or str(uuid.uuid4())
+        
+        # Ejecutamos el agente con la pregunta y el ID de sesión.
+        respuesta_agente = ejecutar_agente(datos_usuario.pregunta, session_id)
+        
+        return {"respuesta": respuesta_agente, "session_id": session_id}
 
+    except Exception as e:
+        # Capturamos cualquier error inesperado y devolvemos una respuesta clara.
+        print(f"Ha ocurrido un error en el endpoint /conversar/: {e}")
+        raise HTTPException(status_code=500, detail=f"Error interno del servidor: {e}")
