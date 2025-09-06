@@ -1,0 +1,17 @@
+Entorno Virtual de Python
+Ignora la carpeta 'venv' que contiene todas las librerías instaladas,
+ya que es muy pesada y específica de cada ordenador.
+/venv/
+
+Archivos de entorno con claves secretas
+¡IMPORTANTE! Esto evita que tu clave de OpenAI se haga pública.
+.env
+
+Archivos de caché de Python
+Son archivos temporales que Python crea y no son necesarios.
+pycache/
+*.pyc
+
+Archivos de configuración de VS Code
+Ignora la configuración local de tu editor.
+.vscode/
