@@ -6,13 +6,9 @@ from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.prompts import ChatPromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-# --- ¡AQUÍ ESTÁ LA CORRECCIÓN DEFINITIVA! ---
-# La herramienta está en 'langchain_community.tools.retrieval', no en 'langchain.agents'.
 from langchain_community.tools.retrieval import create_retrieval_tool
 
 # --- Importación de las Herramientas Personalizadas ---
@@ -31,7 +27,7 @@ Eres multilingüe y debes responder siempre en el mismo idioma en el que te preg
 Reglas de comportamiento:
 1.  Usa SIEMPRE tus herramientas para responder a las preguntas.
 2.  Para preguntas generales sobre la cartera ("qué tienes", "muéstrame villas", etc.), usa la herramienta 'listar_propiedades_disponibles'.
-3.  Para preguntas específicas sobre una propiedad, usa la herramienta 'busqueda_de_propiedades'.
+3.  Para preguntas específicas sobre una propiedad, usa la herramienta 'busqueda_de_propiedades' si está disponible.
 4.  Si no encuentras la información exacta en tus herramientas, responde amablemente que no tienes esa información, pero nunca te la inventes.
 5.  Mantén las respuestas concisas y directas al grano.
 """
@@ -57,13 +53,13 @@ def inicializar_agente():
     loader = DirectoryLoader('./conocimiento/', glob="**/*.txt", loader_cls=TextLoader, loader_kwargs={'encoding': 'utf-8'})
     documentos = loader.load()
     
-    # Creamos las herramientas
+    # Preparamos la lista de herramientas base
     herramienta_listar_propiedades = listar_propiedades_disponibles
     herramientas = [herramienta_listar_propiedades]
 
-    if not documentos:
-        print("ADVERTENCIA: No se encontraron documentos. La herramienta de búsqueda de propiedades no estará disponible.")
-    else:
+    # --- LÓGICA DEFENSIVA ---
+    # Solo creamos y añadimos la herramienta de búsqueda si se cargaron documentos.
+    if documentos:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         docs_divididos = text_splitter.split_documents(documentos)
         
@@ -80,8 +76,9 @@ def inicializar_agente():
             "busqueda_de_propiedades",
             "Busca y devuelve información detallada sobre propiedades inmobiliarias específicas. Úsala cuando te pregunten por características, precios o detalles de una propiedad."
         )
-        # Añadimos la herramienta de búsqueda a la lista
         herramientas.append(herramienta_busqueda_propiedades)
+    else:
+        print("ADVERTENCIA: No se encontraron documentos. La herramienta de búsqueda de propiedades no estará disponible.")
 
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=api_key)
 
@@ -106,4 +103,14 @@ def ejecutar_agente(pregunta: str, session_id: str):
     if not agente_executor:
         raise RuntimeError("El agente no ha sido inicializado.")
 
-    memoria = obtener_o_crear_memoria_con
+    memoria = obtener_o_crear_memoria_conversacion(session_id)
+    historial = memoria.load_memory_variables({})
+
+    respuesta = agente_executor.invoke({
+        "input": pregunta,
+        "chat_history": historial.get("chat_history", [])
+    })
+
+    memoria.save_context({"input": pregunta}, {"output": respuesta["output"]})
+
+    return respuesta["output"]
