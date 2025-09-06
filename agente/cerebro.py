@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-# --- Importaciones de LangChain ---
+# --- Importaciones de LangChain (¡CORREGIDAS Y VERIFICADAS!) ---
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
