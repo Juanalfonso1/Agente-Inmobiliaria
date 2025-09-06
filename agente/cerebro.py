@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-# --- Importaciones de LangChain (Cambiamos el modelo de embeddings) ---
+# --- Importaciones de LangChain ---
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
@@ -40,7 +40,7 @@ def inicializar_agente():
     Se ejecuta una sola vez al iniciar el servidor.
     """
     global agente_executor
-    print("Iniciando el Agente de IA Inmobiliario (Versión Optimizada)...")
+    print("Iniciando el Agente de IA Inmobiliario (Versión Corregida)...")
 
     # 1. Cargar las variables de entorno (API Key de OpenAI)
     load_dotenv()
@@ -59,10 +59,11 @@ def inicializar_agente():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
     docs_divididos = text_splitter.split_documents(documentos)
 
-    # 4. Crear los embeddings usando la API de OpenAI (¡Esta es la optimización!)
+    # 4. Crear los embeddings usando la API de OpenAI
     print("Creando embeddings con la API de OpenAI...")
-    # Este objeto no carga un modelo pesado, solo se prepara para llamar a la API de OpenAI.
-    modelo_embeddings = OpenAIEmbeddings(api_key=api_key)
+    # --- CORRECCIÓN APLICADA AQUÍ ---
+    # Pasamos la API key directamente en la inicialización de los objetos que la usan.
+    modelo_embeddings = OpenAIEmbeddings(openai_api_key=api_key)
 
     # 5. Crear la base de datos vectorial e indexar los documentos
     print("Indexando documentos...")
@@ -81,7 +82,8 @@ def inicializar_agente():
     herramientas = [herramienta_busqueda_propiedades, herramienta_listar_propiedades]
 
     # 7. Crear el cerebro del agente (Modelo de Lenguaje)
-    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, api_key=api_key)
+    # --- CORRECCIÓN APLICADA AQUÍ ---
+    llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=api_key)
 
     # 8. Crear el prompt (las instrucciones del agente)
     prompt = ChatPromptTemplate.from_messages([
@@ -95,6 +97,7 @@ def inicializar_agente():
     agent = create_tool_calling_agent(llm, herramientas, prompt)
     agente_executor = AgentExecutor(agent=agent, tools=herramientas, verbose=True)
     print("✅ Cerebro del agente inmobiliario inicializado.")
+
 
 def obtener_o_crear_memoria_conversacion(session_id: str):
     """Gestiona la memoria para cada conversación."""
