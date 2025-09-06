@@ -11,9 +11,9 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain.prompts import ChatPromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-# --- ¡AQUÍ ESTÁ LA CORRECCIÓN! ---
-# La herramienta ya no está en 'langchain.tools.retrieval', ahora está directamente en 'langchain.agents'.
-from langchain.agents import create_retrieval_tool
+# --- ¡AQUÍ ESTÁ LA CORRECCIÓN DEFINITIVA! ---
+# La herramienta está en 'langchain_community.tools.retrieval', no en 'langchain.agents'.
+from langchain_community.tools.retrieval import create_retrieval_tool
 
 # --- Importación de las Herramientas Personalizadas ---
 from agente.herramientas import listar_propiedades_disponibles
@@ -106,14 +106,4 @@ def ejecutar_agente(pregunta: str, session_id: str):
     if not agente_executor:
         raise RuntimeError("El agente no ha sido inicializado.")
 
-    memoria = obtener_o_crear_memoria_conversacion(session_id)
-    historial = memoria.load_memory_variables({})
-
-    respuesta = agente_executor.invoke({
-        "input": pregunta,
-        "chat_history": historial.get("chat_history", [])
-    })
-
-    memoria.save_context({"input": pregunta}, {"output": respuesta["output"]})
-
-    return respuesta["output"]
+    memoria = obtener_o_crear_memoria_con
