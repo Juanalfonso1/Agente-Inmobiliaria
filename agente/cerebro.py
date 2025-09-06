@@ -40,52 +40,47 @@ def inicializar_agente():
     Se ejecuta una sola vez al iniciar el servidor.
     """
     global agente_executor
-    print("Iniciando el Agente de IA Inmobiliario (Versión Corregida)...")
+    print("Iniciando el Agente de IA Inmobiliario (Versión Final)...")
 
-    # 1. Cargar las variables de entorno (API Key de OpenAI)
-    load_dotenv()
+    # --- CARGA INTELIGENTE DE VARIABLES DE ENTORNO ---
+    # Si no estamos en el entorno de Render, cargamos el archivo .env
+    if os.getenv("RENDER") != "true":
+        print("Entorno local detectado, cargando archivo .env...")
+        load_dotenv()
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise ValueError("No se encontró la API Key de OpenAI. Asegúrate de que está en el archivo .env")
+        raise ValueError("CRÍTICO: No se encontró la API Key de OpenAI. Verifica la variable de entorno en Render o el archivo .env local.")
 
-    # 2. Cargar los documentos de la base de conocimiento
+    # El resto del código es igual...
     print("Cargando documentos de la base de conocimiento...")
     loader = DirectoryLoader('./conocimiento/', glob="**/*.txt", loader_cls=TextLoader, loader_kwargs={'encoding': 'utf-8'})
     documentos = loader.load()
     if not documentos:
-        raise ValueError("No se cargaron documentos. Verifica que la carpeta 'conocimiento' no esté vacía y contenga archivos .txt.")
+        print("ADVERTENCIA: No se encontraron documentos en la carpeta 'conocimiento'. El agente responderá con conocimiento general.")
+    else:
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        docs_divididos = text_splitter.split_documents(documentos)
+        
+        print("Creando embeddings con la API de OpenAI...")
+        modelo_embeddings = OpenAIEmbeddings(openai_api_key=api_key)
 
-    # 3. Dividir los documentos en trozos más pequeños
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-    docs_divididos = text_splitter.split_documents(documentos)
+        print("Indexando documentos...")
+        base_de_datos_vectorial = FAISS.from_documents(docs_divididos, modelo_embeddings)
+        retriever = base_de_datos_vectorial.as_retriever(search_kwargs={"k": 3})
+        print("✅ Base de conocimiento preparada y cargada.")
 
-    # 4. Crear los embeddings usando la API de OpenAI
-    print("Creando embeddings con la API de OpenAI...")
-    # --- CORRECCIÓN APLICADA AQUÍ ---
-    # Pasamos la API key directamente en la inicialización de los objetos que la usan.
-    modelo_embeddings = OpenAIEmbeddings(openai_api_key=api_key)
-
-    # 5. Crear la base de datos vectorial e indexar los documentos
-    print("Indexando documentos...")
-    base_de_datos_vectorial = FAISS.from_documents(docs_divididos, modelo_embeddings)
-    retriever = base_de_datos_vectorial.as_retriever(search_kwargs={"k": 3})
-    print("✅ Base de conocimiento preparada y cargada.")
-
-    # 6. Definir las herramientas que el agente podrá usar
-    herramienta_busqueda_propiedades = create_retrieval_tool(
-        retriever,
-        "busqueda_de_propiedades",
-        "Busca y devuelve información detallada sobre propiedades inmobiliarias específicas. Úsala cuando te pregunten por características, precios o detalles de una propiedad."
-    )
+        herramienta_busqueda_propiedades = create_retrieval_tool(
+            retriever,
+            "busqueda_de_propiedades",
+            "Busca y devuelve información detallada sobre propiedades inmobiliarias específicas. Úsala cuando te pregunten por características, precios o detalles de una propiedad."
+        )
+    
     herramienta_listar_propiedades = listar_propiedades_disponibles
+    herramientas = [herramienta_busqueda_propiedades, herramienta_listar_propiedades] if 'herramienta_busqueda_propiedades' in locals() else [herramienta_listar_propiedades]
 
-    herramientas = [herramienta_busqueda_propiedades, herramienta_listar_propiedades]
-
-    # 7. Crear el cerebro del agente (Modelo de Lenguaje)
-    # --- CORRECCIÓN APLICADA AQUÍ ---
     llm = ChatOpenAI(model="gpt-4o-mini", temperature=0, openai_api_key=api_key)
 
-    # 8. Crear el prompt (las instrucciones del agente)
     prompt = ChatPromptTemplate.from_messages([
         ("system", system_template),
         ("placeholder", "{chat_history}"),
@@ -93,22 +88,19 @@ def inicializar_agente():
         ("placeholder", "{agent_scratchpad}"),
     ])
 
-    # 9. Construir el agente ejecutor
     agent = create_tool_calling_agent(llm, herramientas, prompt)
     agente_executor = AgentExecutor(agent=agent, tools=herramientas, verbose=True)
     print("✅ Cerebro del agente inmobiliario inicializado.")
 
 
 def obtener_o_crear_memoria_conversacion(session_id: str):
-    """Gestiona la memoria para cada conversación."""
     if session_id not in conversaciones:
         conversaciones[session_id] = ConversationBufferMemory(memory_key="chat_history", return_messages=True)
     return conversaciones[session_id]
 
 def ejecutar_agente(pregunta: str, session_id: str):
-    """Ejecuta el agente con la pregunta y el historial de conversación."""
     if not agente_executor:
-        raise RuntimeError("El agente no ha sido inicializado. Llama a 'inicializar_agente()' al iniciar la aplicación.")
+        raise RuntimeError("El agente no ha sido inicializado.")
 
     memoria = obtener_o_crear_memoria_conversacion(session_id)
     historial = memoria.load_memory_variables({})
