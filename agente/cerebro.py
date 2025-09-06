@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-# --- Importaciones de LangChain ---
+# Importaciones de LangChain (¡CORREGIDAS Y VERIFICADAS!)
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
@@ -10,7 +10,7 @@ from langchain.prompts import ChatPromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 # --- ¡ESTA ES LA LÍNEA CORRECTA Y DEFINITIVA! ---
-from langchain_community.tools.retrieval import create_retrieval_tool
+from langchain.tools.retrieval import create_retrieval_tool
 
 # --- Importación de las Herramientas Personalizadas ---
 from agente.herramientas import listar_propiedades_disponibles
@@ -54,12 +54,9 @@ def inicializar_agente():
     loader = DirectoryLoader('./conocimiento/', glob="**/*.txt", loader_cls=TextLoader, loader_kwargs={'encoding': 'utf-8'})
     documentos = loader.load()
     
-    # Preparamos la lista de herramientas base
     herramienta_listar_propiedades = listar_propiedades_disponibles
     herramientas = [herramienta_listar_propiedades]
 
-    # --- LÓGICA DEFENSIVA ---
-    # Solo creamos y añadimos la herramienta de búsqueda si se cargaron documentos.
     if documentos:
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         docs_divididos = text_splitter.split_documents(documentos)
