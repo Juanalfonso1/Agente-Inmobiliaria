@@ -1,9 +1,18 @@
-fastapi==0.110.0
-uvicorn[standard]==0.29.0
+# Framework web
+fastapi==0.115.2
+uvicorn==0.30.6
+
+# LangChain núcleo
+langchain==0.2.14
+langchain-openai==0.1.22
+langchain-community==0.2.12
+
+# OpenAI
+openai==1.44.1
+
+# Vectorstores y embeddings
+faiss-cpu==1.8.0.post1
+
+# Utilidades
 python-dotenv==1.0.1
-langchain==0.1.20
-langchain-openai==0.0.8
-langchain-community==0.0.38
-faiss-cpu==1.8.0
-pypdf==4.1.0
-tiktoken==0.6.0
+tiktoken==0.7.0
