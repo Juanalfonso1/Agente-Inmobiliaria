@@ -14,4 +14,4 @@ faiss-cpu==1.8.0.post1
 
 # Utilidades
 python-dotenv==1.0.1
-tiktoken==0.5.5
+tiktoken==0.5.2
