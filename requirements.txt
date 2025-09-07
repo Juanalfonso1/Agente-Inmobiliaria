@@ -1,18 +1,18 @@
-# Framework web
-fastapi==0.115.2
-uvicorn==0.30.6
-
-# LangChain núcleo
 langchain==0.0.285
+langchain-core==0.1.23
 langchain-openai==0.0.2
 langchain-community==0.0.2
-
-# OpenAI
-openai==1.44.1
-
-# Vectorstores y embeddings
-faiss-cpu==1.8.0.post1
-
-# Utilidades
+openai==1.6.1
+tiktoken==0.5.2
+fastapi==0.110.0
+uvicorn==0.30.0
+faiss-cpu==1.12.0
 python-dotenv==1.0.0
-tiktoken==0.5.1
+pydantic==2.7.0
+pydantic-core==2.18.1
+tenacity==8.5.0
+dataclasses-json==0.5.14
+numpy==1.26.4
+numexpr==2.11.0
+packaging==23.2
+contextlib2==21.6.0
