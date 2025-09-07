@@ -4,6 +4,24 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
+# Aquí tu app
+app = FastAPI()
+
+# 🔐 Pon aquí los dominios que pueden llamar a tu API
+ALLOWED_ORIGINS = [
+    "https://tenerifemy.com",     # ⚡ tu web real
+    "http://localhost:5500",      # para pruebas en local
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 # ⚠️ Import perezoso de cerebro (no al nivel global)
 cerebro_mod = None
 
