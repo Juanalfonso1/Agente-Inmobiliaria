@@ -5,6 +5,7 @@ uvicorn==0.30.6
 # LangChain núcleo
 langchain==0.0.285
 langchain-openai==0.0.2
+langchain-community==0.0.2
 
 # OpenAI
 openai==1.44.1
@@ -13,5 +14,5 @@ openai==1.44.1
 faiss-cpu==1.8.0.post1
 
 # Utilidades
-python-dotenv==1.0.1
-tiktoken==0.5.2
+python-dotenv==1.0.0
+tiktoken==0.5.1
