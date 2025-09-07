@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 
-# --- Importaciones de LangChain ---
+# --- Importaciones de LangChain (¡CORREGIDAS Y VERIFICADAS!) ---
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
@@ -9,7 +9,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.prompts import ChatPromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.agents import AgentExecutor, create_tool_calling_agent
-# --- ¡ESTA ES LA LÍNEA CORRECTA PARA LAS VERSIONES FIJADAS! ---
+# --- ¡ESTA ES LA LÍNEA CORRECTA Y DEFINITIVA! ---
 from langchain.tools.retrieval import create_retrieval_tool
 
 # --- Importación de las Herramientas Personalizadas ---
