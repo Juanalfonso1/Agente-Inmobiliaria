@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 # Aquí tu app
 app = FastAPI()
@@ -20,7 +21,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 # ⚠️ Import perezoso de cerebro (no al nivel global)
 cerebro_mod = None
@@ -72,3 +72,14 @@ async def preguntar(pregunta: str):
     if not agente:
         return {"respuesta": "El agente no está disponible."}
     return {"respuesta": agente.ejecutar_agente(pregunta)}
+
+# --- NUEVO: Endpoint para el chatbot ---
+class Pregunta(BaseModel):
+    mensaje: str
+
+@app.post("/chat")
+async def chat(pregunta: Pregunta):
+    agente = cargar_agente_si_es_posible()
+    if not agente:
+        return {"respuesta": "El agente no está disponible."}
+    return {"respuesta": agente.ejecutar_agente(pregunta.mensaje)}
