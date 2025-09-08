@@ -10,7 +10,8 @@ def detectar_idioma(texto: str, llm) -> str:
     """Detecta el idioma del texto usando el modelo LLM."""
     try:
         consulta = (
-            "Detecta en qué idioma está escrito el siguiente texto y responde con una sola palabra: "
+            "Detecta en qué idioma está escrito el siguiente texto y "
+            "responde con una sola palabra: "
             "Español, Inglés, Alemán, Ruso, Francés o Italiano.\n"
             f"Texto: {texto[:200]}"  # Limitar texto para evitar tokens excesivos
         )
@@ -27,7 +28,7 @@ def agregar_bandera(respuesta: str, idioma: str) -> str:
         "inglés": "🇬🇧",
         "english": "🇬🇧",
         "alemán": "🇩🇪",
-        "german": "🇩🇪", 
+        "german": "🇩🇪",
         "ruso": "🇷🇺",
         "russian": "🇷🇺",
         "francés": "🇫🇷",
@@ -120,8 +121,8 @@ def inicializar_agente():
                         content_length = len(doc.page_content)
                         print(f"   ✅ {filename}: {content_length} caracteres")
                         
-                except Exception as error:
-                    print(f"[WARN] Error cargando archivos {tipo}: {error}")
+                except Exception as file_error:
+                    print(f"[WARN] Error cargando archivos {tipo}: {file_error}")
         
         # Crear función del agente según si hay documentos o no
         if documentos:
@@ -129,7 +130,7 @@ def inicializar_agente():
             
             # Dividir documentos
             splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000, 
+                chunk_size=1000,
                 chunk_overlap=200
             )
             docs_split = splitter.split_documents(documentos)
@@ -146,53 +147,61 @@ def inicializar_agente():
                 chain_type="stuff"
             )
             
-            def agente_con_documentos(pregunta: str):
-                try:
-                    idioma = detectar_idioma(pregunta, llm)
-                    consulta = (
-                        f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
-                        f"Responde siempre con claridad y en un tono cálido y profesional.\n"
-                        f"El idioma de tu respuesta debe ser: {idioma}.\n"
-                        f"Pregunta del cliente: {pregunta}"
-                    )
-                    
-                    respuesta = qa.invoke({"query": consulta})
-                    resultado = respuesta.get("result", str(respuesta))
-                    return agregar_bandera(resultado, idioma)
-                    
-                except Exception as error:
-                    print(f"[ERROR] Fallo en QA: {error}")
-                    return f"⚠️ Lo siento, ocurrió un error procesando tu consulta: {str(error)}"
+            # CORRECCIÓN CRÍTICA: Capturar las variables en el ámbito correcto
+            def crear_agente_con_documentos(qa_chain, llm_model):
+                def agente_con_documentos(pregunta: str):
+                    try:
+                        idioma = detectar_idioma(pregunta, llm_model)
+                        consulta = (
+                            f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
+                            f"Responde siempre con claridad y en un tono cálido y profesional.\n"
+                            f"El idioma de tu respuesta debe ser: {idioma}.\n"
+                            f"Pregunta del cliente: {pregunta}"
+                        )
+                        
+                        respuesta = qa_chain.invoke({"query": consulta})
+                        resultado = respuesta.get("result", str(respuesta))
+                        return agregar_bandera(resultado, idioma)
+                        
+                    except Exception as qa_error:
+                        print(f"[ERROR] Fallo en QA: {qa_error}")
+                        return f"⚠️ Lo siento, ocurrió un error procesando tu consulta: {str(qa_error)}"
+                
+                return agente_con_documentos
             
-            agente_executor = agente_con_documentos
+            agente_executor = crear_agente_con_documentos(qa, llm)
             
         else:
             print("⚠️ No se encontraron documentos. Usando solo el modelo.")
             
-            def agente_sin_documentos(pregunta: str):
-                try:
-                    idioma = detectar_idioma(pregunta, llm)
-                    consulta = (
-                        f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
-                        f"Responde siempre con claridad y en un tono cálido y profesional.\n"
-                        f"El idioma de tu respuesta debe ser: {idioma}.\n"
-                        f"Pregunta del cliente: {pregunta}"
-                    )
-                    
-                    response = llm.invoke(consulta)
-                    return agregar_bandera(response.content, idioma)
-                    
-                except Exception as error:
-                    print(f"[ERROR] Fallo al invocar el modelo: {error}")
-                    return f"⚠️ Error procesando tu consulta: {str(error)}"
+            # CORRECCIÓN CRÍTICA: Capturar el modelo LLM en el ámbito correcto
+            def crear_agente_sin_documentos(llm_model):
+                def agente_sin_documentos(pregunta: str):
+                    try:
+                        idioma = detectar_idioma(pregunta, llm_model)
+                        consulta = (
+                            f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
+                            f"Responde siempre con claridad y en un tono cálido y profesional.\n"
+                            f"El idioma de tu respuesta debe ser: {idioma}.\n"
+                            f"Pregunta del cliente: {pregunta}"
+                        )
+                        
+                        response = llm_model.invoke(consulta)
+                        return agregar_bandera(response.content, idioma)
+                        
+                    except Exception as model_error:
+                        print(f"[ERROR] Fallo al invocar el modelo: {model_error}")
+                        return f"⚠️ Error procesando tu consulta: {str(model_error)}"
+                
+                return agente_sin_documentos
             
-            agente_executor = agente_sin_documentos
+            agente_executor = crear_agente_sin_documentos(llm)
         
         print("✅ Agente inicializado correctamente.")
         return agente_executor
         
-    except Exception as error:
-        mensaje_error = str(error)
+    except Exception as init_error:
+        mensaje_error = str(init_error)
         print(f"[ERROR] No se pudo inicializar el agente: {mensaje_error}")
         agente_executor = lambda pregunta: f"[ERROR] No se pudo inicializar el agente: {mensaje_error}"
         return agente_executor
@@ -213,9 +222,9 @@ def ejecutar_agente(pregunta: str):
     
     try:
         return agente_executor(pregunta)
-    except Exception as error:
-        print(f"[ERROR] El agente falló al responder: {error}")
-        return f"⚠️ Error ejecutando consulta: {str(error)}"
+    except Exception as exec_error:
+        print(f"[ERROR] El agente falló al responder: {exec_error}")
+        return f"⚠️ Error ejecutando consulta: {str(exec_error)}"
 
 # Test básico
 if __name__ == "__main__":

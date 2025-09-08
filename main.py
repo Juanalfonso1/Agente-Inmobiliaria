@@ -1,4 +1,4 @@
-# main.py - Versión corregida
+# main.py - Con puerto alternativo
 
 import os
 import sys
@@ -17,9 +17,11 @@ ALLOWED_ORIGINS = [
     "https://tenerifemy.com",
     "https://www.tenerifemy.com",
     "http://localhost:5500",
-    "http://localhost:3000", 
+    "http://localhost:3000",
+    "http://localhost:8080",  # Puerto alternativo agregado
     "http://127.0.0.1:5500",
-    "http://127.0.0.1:8000"
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8080"   # Puerto alternativo agregado
 ]
 
 # ⚠️ Variables globales para el agente
@@ -207,11 +209,11 @@ if __name__ == "__main__":
     else:
         print(f"❌ No se pudo cargar el agente: {error_inicializacion}")
     
-    # Ejecutar servidor
+    # Ejecutar servidor en puerto alternativo
     try:
         import uvicorn
-        print("🚀 Iniciando servidor en http://0.0.0.0:8000")
-        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+        print("🚀 Iniciando servidor en http://0.0.0.0:8080")
+        uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")
     except KeyboardInterrupt:
         print("🛑 Servidor detenido por el usuario")
     except Exception as e:
