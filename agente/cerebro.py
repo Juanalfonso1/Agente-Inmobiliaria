@@ -34,7 +34,7 @@ def inicializar_agente():
         return agente_executor
 
     try:
-        # --- Cargar modelo ---
+        # --- Cargar modelo principal ---
         llm = ChatOpenAI(
             model="gpt-4o-mini",
             temperature=0.2
@@ -54,6 +54,34 @@ def inicializar_agente():
         except Exception as e:
             print(f"[WARN] No se pudieron cargar conocimiento {e}")
 
+        # --- Función para detectar idioma con el modelo ---
+        def detectar_idioma(texto: str) -> str:
+            try:
+                consulta = f"""
+                Detecta en qué idioma está escrito el siguiente texto y responde con una sola palabra: 
+                Español, Inglés, Alemán, Ruso, Francés o Italiano.
+                Texto: {texto}
+                """
+                idioma = llm.invoke(consulta).content.strip().lower()
+                return idioma
+            except Exception:
+                return "español"  # fallback
+
+        # --- Función para añadir bandera según idioma detectado ---
+        def agregar_bandera(respuesta: str, idioma: str) -> str:
+            if "inglés" in idioma:
+                return f"🇬🇧 {respuesta}"
+            elif "alemán" in idioma:
+                return f"🇩🇪 {respuesta}"
+            elif "ruso" in idioma:
+                return f"🇷🇺 {respuesta}"
+            elif "francés" in idioma:
+                return f"🇫🇷 {respuesta}"
+            elif "italiano" in idioma:
+                return f"🇮🇹 {respuesta}"
+            else:
+                return respuesta  # español sin bandera
+
         if documentos:
             # --- Preparar índice vectorial ---
             splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -70,12 +98,15 @@ def inicializar_agente():
 
             def agente_executor_func(pregunta: str):
                 try:
+                    idioma = detectar_idioma(pregunta)
                     consulta = f"""
                     Eres una agente inmobiliaria profesional, elegante y muy amable.
                     Responde siempre con claridad y en un tono cálido y profesional.
+                    El idioma de tu respuesta debe ser: {idioma}.
                     Pregunta del cliente: {pregunta}
                     """
-                    return qa.run(consulta)
+                    respuesta = qa.run(consulta)
+                    return agregar_bandera(respuesta, idioma)
                 except Exception as e:
                     return f"[ERROR] Fallo en QA: {e}"
 
@@ -86,13 +117,15 @@ def inicializar_agente():
             # --- Si no hay documentos, responde solo con el LLM ---
             def agente_executor_func(pregunta: str):
                 try:
+                    idioma = detectar_idioma(pregunta)
                     consulta = f"""
                     Eres una agente inmobiliaria profesional, elegante y muy amable.
                     Responde siempre con claridad y en un tono cálido y profesional.
+                    El idioma de tu respuesta debe ser: {idioma}.
                     Pregunta del cliente: {pregunta}
                     """
                     respuesta = llm.invoke(consulta)
-                    return respuesta.content
+                    return agregar_bandera(respuesta.content, idioma)
                 except Exception as e:
                     return f"[ERROR] Fallo al invocar el modelo: {e}"
 
