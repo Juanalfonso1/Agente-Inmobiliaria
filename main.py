@@ -29,23 +29,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🤖 Endpoint del agente
 @app.get("/preguntar")
 async def preguntar(pregunta: str = Query(..., description="Pregunta del usuario")):
     try:
-        from cerebro import crear_agente  # ⬅️ import aquí para evitar errores de inicio
-        agente = crear_agente()
-
-        respuesta = agente.run(pregunta)  # ejecuta la pregunta en LangChain + OpenAI
-
+        from cerebro import ejecutar_agente  # ⬅️ import correcto
+        respuesta = ejecutar_agente(pregunta)  # ⬅️ llamada directa, sin .run()
         return {"respuesta": respuesta}
-
     except Exception as e:
         print(f"[ERROR] El agente no pudo responder: {e}")
         return JSONResponse(
-            content={"respuesta": "⚠️ No se pudo conectar."},
+            content={"respuesta": "⚠️ Lo siento, ocurrió un error procesando tu solicitud."},
             status_code=500
         )
+
 
 
 # ⚠️ Import perezoso de cerebro (no al nivel global, todavía no usado)
