@@ -1,7 +1,8 @@
-# main.py
+# main.py - Versión corregida
 
 import os
-from fastapi import FastAPI, Query
+import sys
+from fastapi import FastAPI, Query, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -14,51 +15,74 @@ load_dotenv()
 # 🌐 Configurar CORS
 ALLOWED_ORIGINS = [
     "https://tenerifemy.com",
-    "https://www.tenerifemy.com",  # Con www
+    "https://www.tenerifemy.com",
     "http://localhost:5500",
-    "http://localhost:3000",
+    "http://localhost:3000", 
     "http://127.0.0.1:5500",
-    "*"  # Temporalmente permite todos los orígenes (solo para testing)
+    "http://127.0.0.1:8000"
 ]
 
 # ⚠️ Variables globales para el agente
 cerebro_mod = None
 agente_inicializado = False
+error_inicializacion = None
 
 def cargar_agente_si_es_posible():
     """Carga el módulo cerebro con imports seguros."""
-    global cerebro_mod, agente_inicializado
+    global cerebro_mod, agente_inicializado, error_inicializacion
     
     if cerebro_mod and agente_inicializado:
         return cerebro_mod
     
     try:
-        import cerebro as cerebro_mod  # Importa directamente cerebro.py
+        # Verificar si cerebro.py existe
+        if not os.path.exists('cerebro.py'):
+            error_inicializacion = "No se encuentra el archivo cerebro.py"
+            print(f"[ERROR] {error_inicializacion}")
+            return None
+        
+        # Importar cerebro
+        import cerebro as cerebro_mod
+        print("✅ Módulo cerebro importado correctamente.")
         
         # Inicializar el agente
-        cerebro_mod.inicializar_agente()
-        agente_inicializado = True
+        resultado = cerebro_mod.inicializar_agente()
         
-        print("✅ Agente cargado e inicializado correctamente.")
-        return cerebro_mod
+        if resultado is not None:
+            agente_inicializado = True
+            error_inicializacion = None
+            print("✅ Agente cargado e inicializado correctamente.")
+            return cerebro_mod
+        else:
+            error_inicializacion = "El agente no se inicializó correctamente"
+            print(f"[ERROR] {error_inicializacion}")
+            return None
+            
+    except ImportError as e:
+        error_inicializacion = f"Error de importación: {str(e)}"
+        print(f"[ERROR] {error_inicializacion}")
+        return None
         
     except Exception as error:
-        print(f"[WARN] No se pudo importar o inicializar cerebro: {error}")
+        error_inicializacion = f"Error inesperado: {str(error)}"
+        print(f"[ERROR] {error_inicializacion}")
         return None
 
 # 🔄 Ciclo de vida de la app
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
+    print("🚀 Iniciando aplicación...")
     agente = cargar_agente_si_es_posible()
-    if agente:
-        print("✅ Agente inicializado correctamente.")
+    
+    if agente and agente_inicializado:
+        print("✅ Aplicación iniciada correctamente con agente.")
     else:
-        print("⚠️ No se pudo inicializar el agente.")
+        print(f"⚠️ Aplicación iniciada sin agente. Error: {error_inicializacion}")
     
     yield
     
-    # Shutdown (si necesitas limpieza)
+    # Shutdown
     print("🔄 Cerrando aplicación...")
 
 # 🚀 Inicializar FastAPI con ciclo de vida
@@ -81,17 +105,29 @@ app.add_middleware(
 # 🏠 Endpoint raíz
 @app.get("/")
 async def root():
-    return {"mensaje": "API Inmobiliaria IA funcionando correctamente."}
+    status = "funcionando" if (cerebro_mod and agente_inicializado) else "sin agente"
+    return {
+        "mensaje": f"API Inmobiliaria IA {status}.",
+        "agente_disponible": bool(cerebro_mod and agente_inicializado),
+        "error_inicializacion": error_inicializacion
+    }
 
 # 🤖 Endpoint GET para preguntas
 @app.get("/preguntar")
 async def preguntar(pregunta: str = Query(..., description="Pregunta del usuario")):
+    # Intentar cargar agente si no está disponible
     agente = cargar_agente_si_es_posible()
     
-    if not agente:
-        return JSONResponse(
-            content={"respuesta": "⚠️ El agente no está disponible."},
-            status_code=503
+    if not agente or not agente_inicializado:
+        raise HTTPException(
+            status_code=503,
+            detail=f"El agente no está disponible. Error: {error_inicializacion or 'Desconocido'}"
+        )
+    
+    if not pregunta.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="La pregunta no puede estar vacía."
         )
     
     try:
@@ -101,23 +137,33 @@ async def preguntar(pregunta: str = Query(..., description="Pregunta del usuario
         
     except Exception as error:
         print(f"[ERROR] Fallo al procesar pregunta: {error}")
-        return JSONResponse(
-            content={"respuesta": "⚠️ Lo siento, ocurrió un error procesando tu solicitud."},
-            status_code=500
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error procesando la solicitud: {str(error)}"
         )
 
 # 💬 Endpoint POST para chatbot
-class Pregunta(BaseModel):
+class PreguntaModel(BaseModel):
     mensaje: str
+    
+    class Config:
+        str_strip_whitespace = True
 
 @app.post("/chat")
-async def chat(pregunta: Pregunta):
+async def chat(pregunta: PreguntaModel):
+    # Intentar cargar agente si no está disponible
     agente = cargar_agente_si_es_posible()
     
-    if not agente:
-        return JSONResponse(
-            content={"respuesta": "⚠️ El agente no está disponible."},
-            status_code=503
+    if not agente or not agente_inicializado:
+        raise HTTPException(
+            status_code=503,
+            detail=f"El agente no está disponible. Error: {error_inicializacion or 'Desconocido'}"
+        )
+    
+    if not pregunta.mensaje.strip():
+        raise HTTPException(
+            status_code=400,
+            detail="El mensaje no puede estar vacío."
         )
     
     try:
@@ -127,21 +173,46 @@ async def chat(pregunta: Pregunta):
         
     except Exception as error:
         print(f"[ERROR] Fallo en /chat: {error}")
-        return JSONResponse(
-            content={"respuesta": "⚠️ Error interno al procesar el mensaje."},
-            status_code=500
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error procesando el mensaje: {str(error)}"
         )
+
+# 🔧 Endpoint de estado para debugging
+@app.get("/status")
+async def status():
+    return {
+        "agente_modulo_cargado": bool(cerebro_mod),
+        "agente_inicializado": agente_inicializado,
+        "error_inicializacion": error_inicializacion,
+        "openai_key_configurada": bool(os.getenv("OPENAI_API_KEY")),
+        "directorio_conocimiento_existe": os.path.exists("conocimiento")
+    }
 
 # 🧪 Para pruebas en desarrollo
 if __name__ == "__main__":
-    # Prueba local
-    agente = cargar_agente_si_es_posible()
-    if agente:
-        respuesta = agente.ejecutar_agente("¿Cuál es el precio promedio de una casa en Madrid?")
-        print("Respuesta de prueba:", respuesta)
+    print("🧪 Modo de prueba...")
+    
+    # Verificar configuración básica
+    if not os.getenv("OPENAI_API_KEY"):
+        print("❌ OPENAI_API_KEY no está configurada")
     else:
-        print("❌ El agente no se pudo cargar.")
-        
+        print("✅ OPENAI_API_KEY encontrada")
+    
+    # Probar agente
+    agente = cargar_agente_si_es_posible()
+    if agente and agente_inicializado:
+        respuesta = agente.ejecutar_agente("Hola, ¿cómo estás?")
+        print(f"✅ Respuesta de prueba: {respuesta}")
+    else:
+        print(f"❌ No se pudo cargar el agente: {error_inicializacion}")
+    
     # Ejecutar servidor
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    try:
+        import uvicorn
+        print("🚀 Iniciando servidor en http://0.0.0.0:8000")
+        uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    except KeyboardInterrupt:
+        print("🛑 Servidor detenido por el usuario")
+    except Exception as e:
+        print(f"❌ Error iniciando servidor: {e}")
