@@ -1,4 +1,4 @@
-# cerebro.py - Versión corregida
+# cerebro.py - VERSIÓN DEFINITIVA CORREGIDA
 
 import os
 from dotenv import load_dotenv
@@ -13,7 +13,7 @@ def detectar_idioma(texto: str, llm) -> str:
             "Detecta en qué idioma está escrito el siguiente texto y "
             "responde con una sola palabra: "
             "Español, Inglés, Alemán, Ruso, Francés o Italiano.\n"
-            f"Texto: {texto[:200]}"  # Limitar texto para evitar tokens excesivos
+            f"Texto: {texto[:200]}"
         )
         response = llm.invoke(consulta)
         idioma = response.content.strip().lower()
@@ -27,7 +27,7 @@ def agregar_bandera(respuesta: str, idioma: str) -> str:
     banderas = {
         "inglés": "🇬🇧",
         "english": "🇬🇧",
-        "alemán": "🇩🇪",
+        "alemán": "🇩🇪", 
         "german": "🇩🇪",
         "ruso": "🇷🇺",
         "russian": "🇷🇺",
@@ -40,10 +40,7 @@ def agregar_bandera(respuesta: str, idioma: str) -> str:
     return f"{bandera} {respuesta}".strip()
 
 def inicializar_agente():
-    """
-    Inicializa el agente inmobiliario con OpenAI y base de conocimiento.
-    Maneja errores de configuración, carga de documentos y ejecución.
-    """
+    """Inicializa el agente inmobiliario con OpenAI y base de conocimiento."""
     global agente_executor
     
     print("🔄 Iniciando el Agente de IA Inmobiliario...")
@@ -84,7 +81,7 @@ def inicializar_agente():
             os.makedirs(directorio_conocimiento)
             print("📁 Carpeta creada. Agrega documentos y reinicia el agente.")
         else:
-            # Cargar archivos con mejor manejo de errores
+            # Cargar archivos
             tipos_archivo = [
                 ("TXT", "*.txt", TextLoader),
                 ("DOCX", "*.docx", Docx2txtLoader),  
@@ -93,7 +90,6 @@ def inicializar_agente():
             
             for tipo, patron, loader_cls in tipos_archivo:
                 try:
-                    # Configuración especial para archivos de texto
                     if loader_cls == TextLoader:
                         loader = DirectoryLoader(
                             directorio_conocimiento,
@@ -115,7 +111,6 @@ def inicializar_agente():
                     documentos.extend(docs)
                     print(f"📄 {tipo} cargados: {len(docs)} archivos")
                     
-                    # Mostrar detalles de cada archivo cargado
                     for doc in docs:
                         filename = os.path.basename(doc.metadata.get('source', 'Desconocido'))
                         content_length = len(doc.page_content)
@@ -124,7 +119,7 @@ def inicializar_agente():
                 except Exception as file_error:
                     print(f"[WARN] Error cargando archivos {tipo}: {file_error}")
         
-        # Crear función del agente según si hay documentos o no
+        # CORRECCIÓN CRÍTICA: Funciones sin problemas de ámbito
         if documentos:
             print(f"📚 Procesando {len(documentos)} documentos...")
             
@@ -147,55 +142,55 @@ def inicializar_agente():
                 chain_type="stuff"
             )
             
-            # CORRECCIÓN CRÍTICA: Capturar las variables en el ámbito correcto
-            def crear_agente_con_documentos(qa_chain, llm_model):
-                def agente_con_documentos(pregunta: str):
-                    try:
-                        idioma = detectar_idioma(pregunta, llm_model)
-                        consulta = (
-                            f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
-                            f"Responde siempre con claridad y en un tono cálido y profesional.\n"
-                            f"El idioma de tu respuesta debe ser: {idioma}.\n"
-                            f"Pregunta del cliente: {pregunta}"
-                        )
-                        
-                        respuesta = qa_chain.invoke({"query": consulta})
-                        resultado = respuesta.get("result", str(respuesta))
-                        return agregar_bandera(resultado, idioma)
-                        
-                    except Exception as qa_error:
-                        print(f"[ERROR] Fallo en QA: {qa_error}")
-                        return f"⚠️ Lo siento, ocurrió un error procesando tu consulta: {str(qa_error)}"
-                
-                return agente_con_documentos
+            # Función con documentos - SIN VARIABLES LIBRES
+            def agente_con_documentos(pregunta: str):
+                try:
+                    # Recrear el LLM dentro de la función para evitar problemas de ámbito
+                    llm_local = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+                    idioma = detectar_idioma(pregunta, llm_local)
+                    
+                    consulta = (
+                        f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
+                        f"Responde siempre con claridad y en un tono cálido y profesional.\n"
+                        f"El idioma de tu respuesta debe ser: {idioma}.\n"
+                        f"Pregunta del cliente: {pregunta}"
+                    )
+                    
+                    respuesta = qa.invoke({"query": consulta})
+                    resultado = respuesta.get("result", str(respuesta))
+                    return agregar_bandera(resultado, idioma)
+                    
+                except Exception as qa_error:
+                    print(f"[ERROR] Fallo en QA: {qa_error}")
+                    return f"⚠️ Lo siento, ocurrió un error procesando tu consulta: {str(qa_error)}"
             
-            agente_executor = crear_agente_con_documentos(qa, llm)
+            agente_executor = agente_con_documentos
             
         else:
             print("⚠️ No se encontraron documentos. Usando solo el modelo.")
             
-            # CORRECCIÓN CRÍTICA: Capturar el modelo LLM en el ámbito correcto
-            def crear_agente_sin_documentos(llm_model):
-                def agente_sin_documentos(pregunta: str):
-                    try:
-                        idioma = detectar_idioma(pregunta, llm_model)
-                        consulta = (
-                            f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
-                            f"Responde siempre con claridad y en un tono cálido y profesional.\n"
-                            f"El idioma de tu respuesta debe ser: {idioma}.\n"
-                            f"Pregunta del cliente: {pregunta}"
-                        )
-                        
-                        response = llm_model.invoke(consulta)
-                        return agregar_bandera(response.content, idioma)
-                        
-                    except Exception as model_error:
-                        print(f"[ERROR] Fallo al invocar el modelo: {model_error}")
-                        return f"⚠️ Error procesando tu consulta: {str(model_error)}"
-                
-                return agente_sin_documentos
+            # Función sin documentos - SIN VARIABLES LIBRES
+            def agente_sin_documentos(pregunta: str):
+                try:
+                    # Recrear el LLM dentro de la función
+                    llm_local = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
+                    idioma = detectar_idioma(pregunta, llm_local)
+                    
+                    consulta = (
+                        f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
+                        f"Responde siempre con claridad y en un tono cálido y profesional.\n"
+                        f"El idioma de tu respuesta debe ser: {idioma}.\n"
+                        f"Pregunta del cliente: {pregunta}"
+                    )
+                    
+                    response = llm_local.invoke(consulta)
+                    return agregar_bandera(response.content, idioma)
+                    
+                except Exception as model_error:
+                    print(f"[ERROR] Fallo al invocar el modelo: {model_error}")
+                    return f"⚠️ Error procesando tu consulta: {str(model_error)}"
             
-            agente_executor = crear_agente_sin_documentos(llm)
+            agente_executor = agente_sin_documentos
         
         print("✅ Agente inicializado correctamente.")
         return agente_executor
@@ -207,10 +202,7 @@ def inicializar_agente():
         return agente_executor
 
 def ejecutar_agente(pregunta: str):
-    """
-    Ejecuta el agente con la pregunta dada.
-    Si no está inicializado, lo carga.
-    """
+    """Ejecuta el agente con la pregunta dada."""
     global agente_executor
     
     if agente_executor is None:
