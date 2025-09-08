@@ -63,7 +63,7 @@ def inicializar_agente():
     except ImportError as error:
         mensaje_error = str(error)
         print(f"[ERROR] Fallo en imports: {mensaje_error}")
-        # Define la función de error directamente dentro del except
+        # CORRECCIÓN CLAVE: La función lambda se define DENTRO del except
         agente_executor = lambda pregunta: f"[ERROR] Librerías faltantes: {mensaje_error}"
         return agente_executor
 
@@ -130,19 +130,16 @@ def inicializar_agente():
                 chain_type="stuff"
             )
 
-            # Función con documentos - SIN VARIABLES LIBRES
             def agente_con_documentos(pregunta: str):
                 try:
                     llm_local = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
                     idioma = detectar_idioma(pregunta, llm_local)
-
                     consulta = (
                         f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
                         f"Responde siempre con claridad y en un tono cálido y profesional.\n"
                         f"El idioma de tu respuesta debe ser: {idioma}.\n"
                         f"Pregunta del cliente: {pregunta}"
                     )
-
                     respuesta = qa.invoke({"query": consulta})
                     resultado = respuesta.get("result", str(respuesta))
                     return agregar_bandera(resultado, idioma)
@@ -154,19 +151,16 @@ def inicializar_agente():
         else:
             print(" ⚠️  No se encontraron documentos. Usando solo el modelo.")
 
-            # Función sin documentos - SIN VARIABLES LIBRES
             def agente_sin_documentos(pregunta: str):
                 try:
                     llm_local = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
                     idioma = detectar_idioma(pregunta, llm_local)
-
                     consulta = (
                         f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
                         f"Responde siempre con claridad y en un tono cálido y profesional.\n"
                         f"El idioma de tu respuesta debe ser: {idioma}.\n"
                         f"Pregunta del cliente: {pregunta}"
                     )
-                    
                     response = llm_local.invoke(consulta)
                     return agregar_bandera(response.content, idioma)
                 except Exception as model_error:
@@ -181,7 +175,7 @@ def inicializar_agente():
     except Exception as init_error:
         mensaje_error = str(init_error)
         print(f"[ERROR] No se pudo inicializar el agente: {mensaje_error}")
-        # Define la función de error directamente dentro del except
+        # CORRECCIÓN CLAVE: La función lambda se define DENTRO del except
         agente_executor = lambda pregunta: f"[ERROR] No se pudo inicializar el agente: {mensaje_error}"
         return agente_executor
 
@@ -201,9 +195,3 @@ def ejecutar_agente(pregunta: str):
     except Exception as exec_error:
         print(f"[ERROR] El agente falló al responder: {exec_error}")
         return f" ⚠️  Error ejecutando consulta: {str(exec_error)}"
-
-# Test básico
-if __name__ == "__main__":
-    print("🧪 Probando agente...")
-    respuesta = ejecutar_agente("¿Cuál es el precio promedio de una casa en Madrid?")
-    print(f"Respuesta: {respuesta}")
