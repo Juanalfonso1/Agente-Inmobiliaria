@@ -1,14 +1,13 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-from pydantic import BaseModel
 from fastapi.responses import JSONResponse
 
+# 🔑 Cargar variables de entorno (.env)
 load_dotenv()
 
-# 🚀 Inicializar FastAPI una sola vez
+# 🚀 Inicializar FastAPI
 app = FastAPI()
 
 # 🏠 Endpoint raíz (acepta GET y HEAD)
@@ -30,8 +29,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ⚠️ Import perezoso de cerebro (no al nivel global)
+# 🤖 Endpoint del agente
+@app.get("/preguntar")
+async def preguntar(pregunta: str = Query(..., description="Pregunta del usuario")):
+    try:
+        # 👉 Aquí después conectaremos con LangChain + OpenAI
+        respuesta = f"📌 Estoy procesando tu pregunta: {pregunta}"
+        return {"respuesta": respuesta}
+
+    except Exception as e:
+        print(f"[ERROR] El agente no pudo responder: {e}")
+        return JSONResponse(
+            content={"respuesta": "⚠️ Lo siento, ocurrió un error procesando tu solicitud."},
+            status_code=500
+        )
+
+# ⚠️ Import perezoso de cerebro (no al nivel global, todavía no usado)
 cerebro_mod = None
+
 
 def cargar_agente_si_es_posible():
     """Carga el módulo cerebro con imports seguros."""
