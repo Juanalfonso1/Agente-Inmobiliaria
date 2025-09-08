@@ -33,16 +33,20 @@ app.add_middleware(
 @app.get("/preguntar")
 async def preguntar(pregunta: str = Query(..., description="Pregunta del usuario")):
     try:
-        # 👉 Aquí después conectaremos con LangChain + OpenAI
-        respuesta = f"📌 Estoy procesando tu pregunta: {pregunta}"
+        from cerebro import crear_agente  # ⬅️ import aquí para evitar errores de inicio
+        agente = crear_agente()
+
+        respuesta = agente.run(pregunta)  # ejecuta la pregunta en LangChain + OpenAI
+
         return {"respuesta": respuesta}
 
     except Exception as e:
         print(f"[ERROR] El agente no pudo responder: {e}")
         return JSONResponse(
-            content={"respuesta": "⚠️ Lo siento, ocurrió un error procesando tu solicitud."},
+            content={"respuesta": "⚠️ No se pudo conectar."},
             status_code=500
         )
+
 
 # ⚠️ Import perezoso de cerebro (no al nivel global, todavía no usado)
 cerebro_mod = None
@@ -106,3 +110,4 @@ async def chat(pregunta: Pregunta):
     if not agente:
         return {"respuesta": "El agente no está disponible."}
     return {"respuesta": agente.ejecutar_agente(pregunta.mensaje)}
+from cerebro import crear_agente  # asegúrate de que cerebro.py tiene esta función
