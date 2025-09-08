@@ -44,15 +44,15 @@ def inicializar_agente():
         # --- Cargar documentos ---
         documentos = []
         try:
-            loader_txt = DirectoryLoader("documentos", glob="*.txt", loader_cls=TextLoader)
+            loader_txt = DirectoryLoader("conocimiento", glob="*.txt", loader_cls=TextLoader)
             documentos.extend(loader_txt.load())
-            loader_docx = DirectoryLoader("documentos", glob="*.docx", loader_cls=Docx2txtLoader)
+            loader_docx = DirectoryLoader("conocimiento", glob="*.docx", loader_cls=Docx2txtLoader)
             documentos.extend(loader_docx.load())
-            loader_pdf = DirectoryLoader("documentos", glob="*.pdf", loader_cls=PyPDFLoader)
+            loader_pdf = DirectoryLoader("conocimiento", glob="*.pdf", loader_cls=PyPDFLoader)
             documentos.extend(loader_pdf.load())
-            print(f"📂 Documentos cargados: {len(documentos)}")
+            print(f"📂 conocimiento cargados: {len(documentos)}")
         except Exception as e:
-            print(f"[WARN] No se pudieron cargar documentos: {e}")
+            print(f"[WARN] No se pudieron cargar conocimiento {e}")
 
         if documentos:
             # --- Preparar índice vectorial ---
