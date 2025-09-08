@@ -17,34 +17,44 @@ ALLOWED_ORIGINS = [
 
 # ⚠️ Import perezoso del módulo cerebro
 cerebro_mod = None
+ejecutar_agente = None  # Aquí guardaremos la función que responde preguntas
 
 def cargar_agente_si_es_posible():
     """Carga el módulo cerebro con imports seguros."""
-    global cerebro_mod
+    global cerebro_mod, ejecutar_agente
     if cerebro_mod:
         return cerebro_mod
     try:
-        from cerebro import inicializar_agente, ejecutar_agente
-        cerebro_mod = type("AgenteWrapper", (), {
-            "inicializar_agente": inicializar_agente,
-            "ejecutar_agente": ejecutar_agente
-        })()
+        from agente import cerebro as cerebro_mod  # Importa el módulo completo
+        ejecutar_agente = cerebro_mod.inicializar_agente()  # Obtiene la función ejecutora
         return cerebro_mod
     except Exception as error:
         print(f"[WARN] No se pudo importar cerebro: {error}")
         return None
 
 # 🔄 Ciclo de vida de la app
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     agente = cargar_agente_si_es_posible()
     if agente:
-        try:
-            agente.inicializar_agente()
-            print("✅ Agente inicializado correctamente.")
-        except Exception as error:
-            print(f"[ERROR] Falló la inicialización del agente: {error}")
+        print("✅ Agente inicializado correctamente.")
+    else:
+        print("⚠️ No se pudo inicializar el agente.")
     yield
+
+# 🧪 Ejemplo de uso fuera del ciclo de vida (solo para pruebas locales)
+if __name__ == "__main__":
+    cargar_agente_si_es_posible()
+    if ejecutar_agente:
+        pregunta = "¿Cuál es el precio promedio de una casa en Madrid?"
+        respuesta = ejecutar_agente(pregunta)
+        print(respuesta)
+    else:
+        print("⚠️ El agente no está disponible.")
+
 
 # 🚀 Inicializar FastAPI con ciclo de vida
 app = FastAPI(lifespan=lifespan)
@@ -103,3 +113,10 @@ async def chat(pregunta: Pregunta):
             content={"respuesta": "⚠️ Error interno al procesar el mensaje."},
             status_code=500
         )
+if __name__ == "__main__":
+    cargar_agente_si_es_posible()
+    if cerebro_mod:
+        respuesta = cerebro_mod.ejecutar_agente("¿Cuál es el precio promedio de una casa en Madrid?")
+        print(respuesta)
+    else:
+        print("❌ El agente no se pudo cargar.")

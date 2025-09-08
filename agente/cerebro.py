@@ -139,3 +139,6 @@ def ejecutar_agente(pregunta: str):
         return agente_executor(pregunta)
     except Exception as error:
         return f"[ERROR] El agente no pudo responder: {error}"
+if __name__ == "__main__":
+    respuesta = ejecutar_agente("¿Cuál es el precio promedio de una casa en Madrid?")
+    print(respuesta)
