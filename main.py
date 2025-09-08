@@ -3,13 +3,20 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
-load_dotenv()
 from pydantic import BaseModel
+from fastapi.responses import JSONResponse
 
-# Aquí tu app
+load_dotenv()
+
+# 🚀 Inicializar FastAPI una sola vez
 app = FastAPI()
 
-# 🔐 Pon aquí los dominios que pueden llamar a tu API
+# 🏠 Endpoint raíz (acepta GET y HEAD)
+@app.api_route("/", methods=["GET", "HEAD"])
+def home():
+    return JSONResponse(content={"message": "Agente Inmobiliario en línea 🚀"})
+
+# 🔐 Dominios permitidos para CORS
 ALLOWED_ORIGINS = [
     "https://tenerifemy.com",     # ⚡ tu web real
     "http://localhost:5500",      # para pruebas en local
