@@ -14,9 +14,11 @@ load_dotenv()
 # 🌐 Configurar CORS
 ALLOWED_ORIGINS = [
     "https://tenerifemy.com",
+    "https://www.tenerifemy.com",  # Con www
     "http://localhost:5500",
-    "http://localhost:3000",  # Agregado para desarrollo
-    "http://127.0.0.1:5500"   # Agregado para desarrollo local
+    "http://localhost:3000",
+    "http://127.0.0.1:5500",
+    "*"  # Temporalmente permite todos los orígenes (solo para testing)
 ]
 
 # ⚠️ Variables globales para el agente
