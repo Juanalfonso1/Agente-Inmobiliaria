@@ -16,6 +16,7 @@ load_dotenv()
 ALLOWED_ORIGINS = [
     "https://tenerifemy.com",
     "https://www.tenerifemy.com",
+    "https://www.terramagna.net/inmuebles"
     "http://localhost:5500",
     "http://localhost:3000",
     "http://localhost:8080",  # Puerto alternativo agregado
