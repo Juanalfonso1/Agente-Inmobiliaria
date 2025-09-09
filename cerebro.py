@@ -1,4 +1,4 @@
-# cerebro.py - VERSIÓN DEFINITIVA CORREGIDA
+# cerebro.py - VERSIÓN DEFINITIVA CORREGIDA SIMPLE
 
 import os
 from dotenv import load_dotenv
@@ -12,8 +12,8 @@ def detectar_idioma(texto: str, llm) -> str:
         # PROMPT SÚPER ESTRICTO Y PRECISO - SOLO 3 IDIOMAS
         consulta = (
             "Tu tarea es identificar el idioma de un texto. Debes responder obligatoriamente con una sola palabra de la siguiente lista: "
-            "[español, inglés, alemán].\n"
-            "No añadas puntuación, explicaciones ni ninguna otra palabra. Solo una palabra de la lista.\n"
+            "[español, inglés, alemán]. "
+            "No añadas puntuación, explicaciones ni ninguna otra palabra. Solo una palabra de la lista. "
             f"Texto a analizar: \"{texto[:200]}\""
         )
         
@@ -25,19 +25,6 @@ def detectar_idioma(texto: str, llm) -> str:
     except Exception as e:
         print(f"[WARN] Error detectando idioma: {e}")
         return "español"
-
-def obtener_codigo_idioma(idioma: str) -> str:
-    """Convierte el idioma detectado a código para el prompt del LLM."""
-    codigos_idioma = {
-        "español": "español (Spanish)",
-        "spanish": "español (Spanish)", 
-        "inglés": "inglés (English)",
-        "english": "inglés (English)",
-        "alemán": "alemán (German)",
-        "german": "alemán (German)",
-        "deutsch": "alemán (German)"
-    }
-    return codigos_idioma.get(idioma.lower(), "español (Spanish)")
 
 def agregar_bandera(respuesta: str, idioma: str) -> str:
     """Agrega bandera según el idioma detectado - SOLO 3 IDIOMAS."""
@@ -54,6 +41,30 @@ def agregar_bandera(respuesta: str, idioma: str) -> str:
     
     bandera = banderas.get(idioma.lower(), '🇪🇸')
     return f"{bandera} {respuesta}".strip()
+
+def crear_prompt_multiidioma(pregunta: str, idioma: str) -> str:
+    """Crea el prompt con instrucciones específicas de idioma."""
+    if idioma in ["inglés", "english"]:
+        return (
+            f"You are a professional, elegant and very friendly real estate agent. "
+            f"IMPORTANT: You must respond COMPLETELY in English. "
+            f"Always respond clearly and in a warm and professional tone. "
+            f"Client question: {pregunta}"
+        )
+    elif idioma in ["alemán", "german", "deutsch"]:
+        return (
+            f"Sie sind ein professioneller, eleganter und sehr freundlicher Immobilienmakler. "
+            f"WICHTIG: Sie müssen VOLLSTÄNDIG auf Deutsch antworten. "
+            f"Antworten Sie immer klar und in einem warmen und professionellen Ton. "
+            f"Kundenfrage: {pregunta}"
+        )
+    else:  # español por defecto
+        return (
+            f"Eres una agente inmobiliaria profesional, elegante y muy amable. "
+            f"IMPORTANTE: Debes responder COMPLETAMENTE en español. "
+            f"Responde siempre con claridad y en un tono cálido y profesional. "
+            f"Pregunta del cliente: {pregunta}"
+        )
 
 def inicializar_agente():
     """Inicializa el agente inmobiliario con OpenAI y base de conocimiento."""
@@ -149,18 +160,7 @@ def inicializar_agente():
                 try:
                     llm_local = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
                     idioma_detectado = detectar_idioma(pregunta, llm_local)
-                    codigo_idioma = obtener_codigo_idioma(idioma_detectado)
-                    
-                    # PROMPT MEJORADO CON INSTRUCCIONES ESPECÍFICAS DE IDIOMA
-                    consulta = (
-                        f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
-                        f"IMPORTANTE: Debes responder OBLIGATORIAMENTE en {codigo_idioma}.\n"
-                        f"Si el idioma es inglés, responde completamente en inglés.\n"
-                        f"Si el idioma es alemán, responde completamente en alemán.\n"
-                        f"Si el idioma es español, responde completamente en español.\n"
-                        f"Responde siempre con claridad y en un tono cálido y profesional.\n"
-                        f"Pregunta del cliente: {pregunta}"
-                    )
+                    consulta = crear_prompt_multiidioma(pregunta, idioma_detectado)
                     
                     respuesta = qa.invoke({"query": consulta})
                     resultado = respuesta.get("result", str(respuesta))
@@ -180,18 +180,7 @@ def inicializar_agente():
                 try:
                     llm_local = ChatOpenAI(model="gpt-4o-mini", temperature=0.2)
                     idioma_detectado = detectar_idioma(pregunta, llm_local)
-                    codigo_idioma = obtener_codigo_idioma(idioma_detectado)
-                    
-                    # PROMPT MEJORADO CON INSTRUCCIONES ESPECÍFICAS DE IDIOMA
-                    consulta = (
-                        f"Eres una agente inmobiliaria profesional, elegante y muy amable.\n"
-                        f"IMPORTANTE: Debes responder OBLIGATORIAMENTE en {codigo_idioma}.\n"
-                        f"Si el idioma es inglés, responde completamente en inglés.\n"
-                        f"Si el idioma es alemán, responde completamente en alemán.\n" 
-                        f"Si el idioma es español, responde completamente en español.\n"
-                        f"Responde siempre con claridad y en un tono cálido y profesional.\n"
-                        f"Pregunta del cliente: {pregunta}"
-                    )
+                    consulta = crear_prompt_multiidioma(pregunta, idioma_detectado)
                     
                     response = llm_local.invoke(consulta)
                     return agregar_bandera(response.content, idioma_detectado)
