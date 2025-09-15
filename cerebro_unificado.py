@@ -348,3 +348,46 @@ def inicializar_agente():
         logger.error(f"Error crítico inicializando agente: {e}")
         agente_executor = lambda pregunta, **kwargs: f"Error del sistema: {str(e)}"
         return agente_executor 
+# FUNCIONES PÚBLICAS PARA CADA PLATAFORMA
+
+def ejecutar_agente(pregunta: str):
+    """Ejecuta agente para WEB - función original."""
+    global agente_executor
+    
+    if agente_executor is None:
+        logger.info("🔄 Inicializando agente...")
+        inicializar_agente()
+    
+    if agente_executor is None:
+        return "❌ No se pudo inicializar el agente"
+    
+    try:
+        return agente_executor(pregunta, plataforma="web")
+    except Exception as e:
+        logger.error(f"❌ Error ejecutando agente web: {e}")
+        return f"⚠️ Error procesando consulta: {str(e)}"
+
+def ejecutar_agente_whatsapp(pregunta: str, numero_whatsapp: str = None):
+    """Ejecuta agente para WhatsApp - versión optimizada."""
+    global agente_executor
+    
+    if agente_executor is None:
+        logger.info("🔄 Inicializando agente...")
+        inicializar_agente()
+    
+    if agente_executor is None:
+        return "❌ Servicio temporalmente no disponible"
+    
+    try:
+        # Log de interacción (sin datos sensibles)
+        numero_anonimo = numero_whatsapp[-4:] + "****" if numero_whatsapp else "desconocido"
+        logger.info(f"📱 WhatsApp de {numero_anonimo}: {pregunta[:50]}...")
+        
+        respuesta = agente_executor(pregunta, plataforma="whatsapp", numero_whatsapp=numero_whatsapp)
+        
+        logger.info(f"✅ Respuesta WhatsApp enviada ({len(respuesta)} chars)")
+        return respuesta
+        
+    except Exception as e:
+        logger.error(f"❌ Error ejecutando agente WhatsApp: {e}")
+        return "⚠️ Error procesando tu mensaje. Intenta nuevamente."
