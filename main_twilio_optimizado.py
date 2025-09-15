@@ -58,12 +58,12 @@ def cargar_agente_si_es_posible():
         return cerebro_mod
     
     try:
-        if not os.path.exists('cerebro_unificado_optimizado.py'):
+        if not os.path.exists('cerebro_unificado.py'):
             error_inicializacion = "cerebro_unificado_optimizado.py no encontrado"
             logger.error(f"❌ {error_inicializacion}")
             return None
         
-        import cerebro_unificado_optimizado as cerebro_mod
+        import cerebro_unificado as cerebro_mod
         logger.info("✅ cerebro_unificado_optimizado importado")
         
         resultado = cerebro_mod.inicializar_agente()
