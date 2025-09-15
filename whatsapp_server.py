@@ -8,6 +8,7 @@ from twilio.rest import Client
 from twilio.request_validator import RequestValidator
 from dotenv import load_dotenv
 from datetime import datetime
+from fastapi.middleware.cors import CORSMiddleware
 
 # IMPORTACIÓN CORREGIDA - usar cerebro.py
 from cerebro import ejecutar_agente_whatsapp, ejecutar_agente, inicializar_agente
@@ -55,6 +56,20 @@ app = FastAPI(
     title="WhatsApp Business API - Inmobiliaria",
     version="2.0.0",
     description="API para asistente inmobiliario via web y WhatsApp"
+)
+
+app = FastAPI(
+    title="WhatsApp Business API - Inmobiliaria",
+    version="2.0.0",
+    description="API para asistente inmobiliario via web y WhatsApp"
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/")
