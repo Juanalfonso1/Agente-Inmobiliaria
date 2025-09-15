@@ -141,30 +141,8 @@ def crear_prompt_optimizado(pregunta: str, idioma: str, plataforma: str = "web")
         )
 
 def esta_en_horario_comercial() -> bool:
-    """Verificación de horario comercial."""
-    ahora = datetime.now()
-    return ahora.weekday() < 5 and 9 <= ahora.hour < 18  # L-V 9-18h
-
-def generar_respuesta_fuera_horario(idioma: str) -> str:
-    """Respuesta fuera de horario."""
-    if idioma in ["inglés", "english"]:
-        return (
-            "🇬🇧 Hello! We're outside business hours (Mon-Fri 9-18h). "
-            "We'll respond first thing tomorrow morning! "
-            "For urgent matters: +34 XXX XXX XXX 📞"
-        )
-    elif idioma in ["alemán", "german", "deutsch"]:
-        return (
-            "🇩🇪 Hallo! Wir sind außerhalb der Geschäftszeiten (Mo-Fr 9-18h). "
-            "Wir antworten morgen früh! "
-            "Dringend: +34 XXX XXX XXX 📞"
-        )
-    else:
-        return (
-            "🇪🇸 ¡Hola! Estamos fuera del horario (L-V 9-18h). "
-            "Responderemos mañana temprano! "
-            "Para urgencias: +34 XXX XXX XXX 📞"
-        )
+    """Verificación de horario comercial - SIEMPRE ACTIVO 24/7."""
+    return True  # Siempre disponible       
 
 def inicializar_agente():
     """Inicializa el agente inmobiliario con OpenAI y base de conocimiento."""
@@ -268,12 +246,6 @@ def inicializar_agente():
                     # Detectar idioma
                     idioma_detectado = detectar_idioma(pregunta_procesada, llm)
                     
-                    # Control de horario solo para WhatsApp
-                    if (plataforma.lower() == "whatsapp" and
-                        not esta_en_horario_comercial() and
-                        not any(urgente in pregunta_procesada.lower() for urgente in ['urgente', 'emergency', 'notfall'])):
-                        return generar_respuesta_fuera_horario(idioma_detectado)
-                    
                     # Crear consulta
                     consulta = crear_prompt_optimizado(pregunta_procesada, idioma_detectado, plataforma)
                     
@@ -303,11 +275,6 @@ def inicializar_agente():
                         return "Mensaje vacío. ¿Podrías escribir tu consulta?"
                     
                     idioma_detectado = detectar_idioma(pregunta_procesada, llm)
-                    
-                    if (plataforma.lower() == "whatsapp" and
-                        not esta_en_horario_comercial() and
-                        not any(urgente in pregunta_procesada.lower() for urgente in ['urgente', 'emergency', 'notfall'])):
-                        return generar_respuesta_fuera_horario(idioma_detectado)
                     
                     consulta = crear_prompt_optimizado(pregunta_procesada, idioma_detectado, plataforma)
                     
