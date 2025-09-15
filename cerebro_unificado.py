@@ -262,4 +262,89 @@ def inicializar_agente():
             embeddings = OpenAIEmbeddings()
             vectorstore = FAISS.from_documents(docs_split, embeddings)
             retriever = vectorstore.as_retriever(search_kwargs={"k": 3})  # Top 3 chunks
+           # Crear cadena QA optimizada
+            qa = RetrievalQA.from_chain_type(
+                llm=llm,
+                retriever=retriever,
+                chain_type="stuff",
+                return_source_documents=False  # Más eficiente
+            )
             
+            def agente_con_documentos(pregunta: str, plataforma: str = "web", numero_whatsapp: str = None):
+                try:
+                    # Limpiar pregunta si viene de WhatsApp
+                    pregunta_procesada = limpiar_texto_whatsapp(pregunta) if plataforma.lower() == "whatsapp" else pregunta
+                    
+                    if not pregunta_procesada.strip():
+                        return "No pude entender tu mensaje. ¿Podrías reformularlo?"
+                    
+                    # Detección rápida de idioma
+                    idioma_detectado = detectar_idioma(pregunta_procesada, llm)
+                    
+                    # Control de horario solo para WhatsApp
+                    if (plataforma.lower() == "whatsapp" and 
+                        not esta_en_horario_comercial() and 
+                        not any(urgente in pregunta_procesada.lower() 
+                               for urgente in ['urgente', 'emergency', 'notfall'])):
+                        return generar_respuesta_fuera_horario(idioma_detectado)
+                    
+                    # Crear consulta optimizada
+                    consulta = crear_prompt_multiidioma_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+                    
+                    # Ejecutar QA
+                    respuesta = qa.invoke({"query": consulta})
+                    resultado = respuesta.get("result", str(respuesta))
+                    
+                    # Formatear según plataforma
+                    resultado_formateado = formatear_respuesta_por_plataforma(resultado, plataforma)
+                    
+                    # Agregar bandera y devolver
+                    return agregar_bandera(resultado_formateado, idioma_detectado)
+                    
+                except Exception as e:
+                    logger.error(f"Error en agente con documentos: {e}")
+                    return "Error procesando consulta. Intenta nuevamente."
+            
+            agente_executor = agente_con_documentos
+            logger.info("Agente con documentos inicializado")
+            
+        else:
+            # Agente sin documentos - solo LLM
+            logger.info("Sin documentos, usando solo LLM")
+            
+            def agente_sin_documentos(pregunta: str, plataforma: str = "web", numero_whatsapp: str = None):
+                try:
+                    pregunta_procesada = limpiar_texto_whatsapp(pregunta) if plataforma.lower() == "whatsapp" else pregunta
+                    
+                    if not pregunta_procesada.strip():
+                        return "Mensaje vacío. ¿Podrías escribir tu consulta?"
+                    
+                    idioma_detectado = detectar_idioma(pregunta_procesada, llm)
+                    
+                    if (plataforma.lower() == "whatsapp" and 
+                        not esta_en_horario_comercial() and
+                        not any(urgente in pregunta_procesada.lower() 
+                               for urgente in ['urgente', 'emergency', 'notfall'])):
+                        return generar_respuesta_fuera_horario(idioma_detectado)
+                    
+                    consulta = crear_prompt_multiidioma_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+                    
+                    response = llm.invoke(consulta)
+                    resultado_formateado = formatear_respuesta_por_plataforma(response.content, plataforma)
+                    
+                    return agregar_bandera(resultado_formateado, idioma_detectado)
+                    
+                except Exception as e:
+                    logger.error(f"Error en agente sin documentos: {e}")
+                    return "Error procesando consulta. Intenta más tarde."
+            
+            agente_executor = agente_sin_documentos
+            logger.info("Agente sin documentos inicializado")
+        
+        logger.info("Agente inmobiliario listo")
+        return agente_executor
+        
+    except Exception as e:
+        logger.error(f"Error crítico inicializando agente: {e}")
+        agente_executor = lambda pregunta, **kwargs: f"Error del sistema: {str(e)}"
+        return agente_executor 
