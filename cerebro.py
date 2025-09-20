@@ -75,31 +75,32 @@ def detectar_intencion_inicial(texto: str) -> str:
     """Detecta si el mensaje es un saludo inicial o ya indica intención específica."""
     texto_lower = texto.lower().strip()
     
-    # Palabras que indican saludo inicial
-    saludos = ['hola', 'hello', 'hi', 'buenos días', 'buenas tardes', 'buenas noches', 'hey', 'buenas']
+    # Palabras que indican saludo inicial simple
+    saludos_simples = ['hola', 'hello', 'hi', 'buenos días', 'buenas tardes', 'buenas noches', 'hey', 'buenas']
     
     # Palabras que indican intención de propiedades
     inmobiliario = ['alquiler', 'venta', 'casa', 'piso', 'apartamento', 'propiedad', 'inmueble', 
                    'rent', 'sale', 'house', 'apartment', 'property', 'comprar', 'rentar', 'vender']
     
-    # Palabras que indican otros temas
-    otros_temas = ['consulta legal', 'información legal', 'servicio legal', 'ayuda legal', 'contacto', 'vanessa']
+    # Palabras que indican otros temas específicos
+    otros_temas = ['consulta legal', 'información legal', 'servicio legal', 'ayuda legal', 'contacto', 'vanessa', 
+                   'llamar', 'llame', 'teléfono', 'telefono', 'call', 'phone']
     
-    # Si es exactamente un saludo simple
-    if texto_lower in saludos or (any(saludo in texto_lower for saludo in saludos) and len(texto.split()) <= 2):
+    # Si es exactamente un saludo simple sin más contexto
+    if texto_lower in saludos_simples or (any(saludo in texto_lower for saludo in saludos_simples) and len(texto.split()) <= 2):
         return "saludo_inicial"
     
     # Verificar si contiene palabras inmobiliarias específicas
     if any(palabra in texto_lower for palabra in inmobiliario):
         return "inmobiliario_directo"
     
-    # Verificar si menciona otros temas específicamente
+    # Verificar si menciona otros temas específicamente (incluye solicitudes de llamada)
     if any(tema in texto_lower for tema in otros_temas):
         return "otro_tema"
     
-    # Por defecto, tratar como saludo inicial si es mensaje corto
-    if len(texto.split()) <= 3:
-        return "saludo_inicial"
+    # Si el mensaje es más largo o tiene contenido específico, NO es saludo inicial
+    if len(texto.split()) > 3:
+        return "otro_tema"
     
     return "saludo_inicial"
 
@@ -115,10 +116,12 @@ def detectar_respuesta_categoria(texto: str) -> str:
         'alquileres', 'ventas', 'propiedades'
     ]
     
-    # Palabras que indican otro tema claramente
+    # Palabras que indican otro tema claramente (incluye solicitudes de llamada)
     palabras_otro_tema = [
         'otro tema', 'otra cosa', 'diferente', 'consulta legal', 'información legal', 
-        'servicio legal', 'no', 'nada', 'otro asunto', 'legal', 'jurídico'
+        'servicio legal', 'no', 'nada', 'otro asunto', 'legal', 'jurídico',
+        'llamar', 'llame', 'teléfono', 'telefono', 'call', 'phone', 'contacto',
+        'hablar', 'conversar', 'consulta personal', 'quiero que me llame'
     ]
     
     # Frases que indican seguimiento o más preguntas
@@ -134,7 +137,10 @@ def detectar_respuesta_categoria(texto: str) -> str:
     elif any(palabra in texto_lower for palabra in palabras_seguimiento):
         return "seguimiento"
     else:
-        return "inmobiliario"  # Por defecto asumir inmobiliario
+        # Si menciona algo específico pero no está claro, tratar como otro tema
+        if len(texto.split()) > 4:
+            return "otro_tema"
+        return "inmobiliario"  # Por defecto asumir inmobiliario para respuestas cortas
 
 def obtener_estado_conversacion(numero_whatsapp: str) -> dict:
     """Obtiene el estado actual de la conversación."""
@@ -247,7 +253,43 @@ def formatear_respuesta_por_plataforma(respuesta: str, plataforma: str = "web") 
         # Web: respuesta completa sin limitaciones
         return respuesta
 
-def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma: str = "web") -> str:
+def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "web") -> str:
+    """Crea prompt para consultas de otro tema sin repetir bienvenida."""
+    
+    # Instrucciones base
+    if plataforma.lower() == "whatsapp":
+        formato_base = "WhatsApp (máx 3900 chars, emojis apropiados, *negritas* importantes)"
+    else:
+        formato_base = "web (respuesta completa, formato markdown si necesario)"
+    
+    # Prompts por idioma para otros temas
+    if idioma in ["inglés", "english"]:
+        return (
+            f"You are Vanessa's professional virtual assistant from TerraMagna Real State Boutique. "
+            f"A client has a non-real estate inquiry. Respond professionally and helpfully. "
+            f"Respond in English via {formato_base}. "
+            f"Be warm, professional, and offer appropriate assistance. "
+            f"If they want to be contacted personally, ask for their name and phone number. "
+            f"Client inquiry: {pregunta}"
+        )
+    elif idioma in ["alemán", "german", "deutsch"]:
+        return (
+            f"Sie sind Vanessas professioneller virtueller Assistent von TerraMagna Real State Boutique. "
+            f"Ein Kunde hat eine Anfrage, die nicht mit Immobilien zusammenhängt. Antworten Sie professionell und hilfreich. "
+            f"Antworten Sie auf Deutsch via {formato_base}. "
+            f"Seien Sie warm, professionell und bieten Sie angemessene Hilfe an. "
+            f"Wenn sie persönlich kontaktiert werden möchten, fragen Sie nach Name und Telefonnummer. "
+            f"Kundenanfrage: {pregunta}"
+        )
+    else:  # español
+        return (
+            f"Eres el asistente virtual profesional de Vanessa de TerraMagna Real State Boutique. "
+            f"Un cliente tiene una consulta que no es sobre inmuebles. Responde de manera profesional y útil. "
+            f"Responde en español via {formato_base}. "
+            f"Sé cálido, profesional y ofrece la asistencia apropiada. "
+            f"Si quieren que les llame personalmente, pide su nombre y número de teléfono. "
+            f"Consulta del cliente: {pregunta}"
+        )
     """Crea prompt optimizado para consultas inmobiliarias."""
     
     # Instrucciones base
@@ -495,7 +537,13 @@ def inicializar_agente():
                                 resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
                                 actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
                             else:
-                                resultado = generar_respuesta_otro_tema(idioma_detectado)
+                                # Si sigue siendo otro tema, responder específicamente sin repetir bienvenida
+                                logger.info("Cliente continúa con otro tema - respuesta directa")
+                                consulta = crear_prompt_para_otro_tema(pregunta_procesada, idioma_detectado, plataforma)
+                                respuesta = qa.invoke({"query": consulta})
+                                resultado_base = respuesta.get("result", str(respuesta))
+                                resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
+                                actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
                         
                         # Si ya finalizó pero escribe de nuevo
                         elif estado_conversacion["estado"] == "finalizado":
