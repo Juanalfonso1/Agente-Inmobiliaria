@@ -588,23 +588,28 @@ def formatear_respuesta_por_plataforma(respuesta: str, plataforma: str = "web") 
 def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma: str = "web") -> str:
     """Crea prompt optimizado para consultas inmobiliarias."""
     
+    # Instrucciones base
     if plataforma.lower() == "whatsapp":
         formato_base = "WhatsApp (máx 3900 chars, emojis apropiados, *negritas* importantes)"
     else:
         formato_base = "web (respuesta completa, formato markdown si necesario)"
     
+    # Prompts por idioma para consultas inmobiliarias
     if idioma in ["inglés", "english"]:
         return (
             f"You are Vanessa's professional virtual assistant from TerraMagna Real State Boutique. "
+            f"You help clients with rental and sale property inquiries. "
             f"Respond in English via {formato_base}. "
+            f"Be warm, professional, and helpful. Use property information from your knowledge base. "
             
             f"CRITICAL INSTRUCTIONS FOR SALES INQUIRIES: "
-            f"When asked about properties for SALE/VENTA, follow this EXACT format: "
+            f"When asked about properties for SALE, follow this EXACT format: "
             f"1. Start with: 'We currently have X properties for sale:' "
-            f"2. List properties like: '- 1 Villa 4 bedrooms in Costa Adeje Golf area' "
-            f"3. Do NOT include prices or URLs in the initial list "
-            f"4. End with: 'Which type of property interests you or would you like details about any specific one?' "
-            f"5. Only provide complete details (price, URL) when they ask for a specific property "
+            f"2. List all properties WITHOUT prices or URLs "
+            f"3. End EXACTLY with: 'What type of property interests you or would you like detailed information about any specific one?' "
+            f"4. DO NOT add any additional questions after this "
+            f"5. DO NOT ask 'Is there anything else I can help you with?' in sales inquiries "
+            f"6. Only provide complete details when they ask for a specific property "
             
             f"Use ONLY information from your knowledge base files. "
             f"Client question: {pregunta}"
@@ -612,15 +617,18 @@ def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma:
     elif idioma in ["alemán", "german", "deutsch"]:
         return (
             f"Sie sind Vanessas professioneller virtueller Assistent von TerraMagna Real State Boutique. "
+            f"Sie helfen Kunden bei Anfragen zu Miet- und Verkaufsimmobilien. "
             f"Antworten Sie auf Deutsch via {formato_base}. "
+            f"Seien Sie warm, professionell und hilfreich. Verwenden Sie Immobilieninformationen aus Ihrer Wissensbasis. "
             
             f"KRITISCHE ANWEISUNGEN FÜR VERKAUFSANFRAGEN: "
             f"Bei Fragen zu VERKAUFSIMMOBILIEN folgen Sie diesem EXAKTEN Format: "
             f"1. Beginnen Sie mit: 'Wir haben derzeit X Immobilien zum Verkauf:' "
-            f"2. Listen Sie auf wie: '- 1 Villa 4 Schlafzimmer in Costa Adeje Golf Bereich' "
-            f"3. Keine Preise oder URLs in der ersten Liste "
-            f"4. Enden Sie mit: 'Welche Art von Immobilie interessiert Sie oder möchten Sie Details zu einer bestimmten?' "
-            f"5. Vollständige Details (Preis, URL) nur wenn sie nach einer bestimmten Immobilie fragen "
+            f"2. Listen Sie alle Immobilien OHNE Preise oder URLs auf "
+            f"3. Enden Sie GENAU mit: 'Welche Art von Immobilie interessiert Sie oder möchten Sie detaillierte Informationen zu einer bestimmten?' "
+            f"4. Fügen Sie KEINE zusätzlichen Fragen danach hinzu "
+            f"5. Fragen Sie NICHT 'Gibt es noch etwas, womit ich Ihnen helfen kann?' bei Verkaufsanfragen "
+            f"6. Geben Sie nur vollständige Details an, wenn sie nach einer bestimmten Immobilie fragen "
             
             f"Verwenden Sie NUR Informationen aus Ihren Wissensdateien. "
             f"Kundenfrage: {pregunta}"
@@ -628,15 +636,18 @@ def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma:
     else:  # español
         return (
             f"Eres el asistente virtual profesional de Vanessa de TerraMagna Real State Boutique. "
+            f"Ayudas a clientes con consultas sobre propiedades en alquiler y venta. "
             f"Responde en español via {formato_base}. "
+            f"Sé cálido, profesional y útil. Usa la información de propiedades de tu base de conocimientos. "
             
             f"INSTRUCCIONES CRÍTICAS PARA CONSULTAS DE VENTAS: "
             f"Cuando pregunten por propiedades en VENTA, sigue este formato EXACTO: "
             f"1. Empieza con: 'Tenemos actualmente X propiedades en venta:' "
-            f"2. Lista como: '- 1 Villa 4 habitaciones en zona Costa Adeje Golf' "
-            f"3. NO incluir precios ni URLs en la lista inicial "
-            f"4. Termina con: '¿Qué tipo de propiedad te interesa o te gustaría información detallada de alguna en concreto?' "
-            f"5. Solo dar detalles completos (precio, URL) cuando pregunten por una propiedad específica "
+            f"2. Lista todas las propiedades SIN precios ni URLs "
+            f"3. Termina EXACTAMENTE con: '¿Qué tipo de propiedad te interesa o te gustaría información detallada de alguna en concreto?' "
+            f"4. NO añadir ninguna pregunta adicional después "
+            f"5. NO preguntar '¿Hay algo más en lo que pueda ayudarte?' en consultas de ventas "
+            f"6. Solo dar detalles completos cuando pregunten por una propiedad específica "
             
             f"Usa ÚNICAMENTE información de tus archivos de base de conocimientos. "
             f"Pregunta del cliente: {pregunta}"
@@ -992,9 +1003,7 @@ def inicializar_agente():
                                 else:
                                     resultado = respuesta_base + "¡Perfecto! He anotado tu información de contacto. Vanessa te llamará lo antes posible."
                                 
-                                # Preguntar si necesita algo más
-                                resultado += "\n\n" + generar_pregunta_necesita_algo_mas(idioma_detectado)
-                                actualizar_estado_conversacion(numero_whatsapp, "preguntando_algo_mas")
+                                # NO añadir pregunta de seguimiento para consultas de ventas iniciales generar_pregunta_seguimiento(idioma_detectado)
                             else:
                                 # Si no da información clara, recordar que la necesitamos
                                 logger.info("Cliente no proporcionó datos claros - pedir de nuevo")
