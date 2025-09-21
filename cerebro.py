@@ -261,24 +261,33 @@ def detectar_datos_contacto(texto: str) -> bool:
     
     # Patrones que indican datos de contacto
     tiene_nombre = any(palabra in texto_lower for palabra in [
-        'mi nombre es', 'me llamo', 'soy', 'my name is', 'i am', 'ich bin', 'ich heiße'
+        'mi nombre es', 'me llamo', 'soy', 'my name is', 'i am', 'ich bin', 'ich heiße',
+        'nombre es', 'nombre:', 'mi nombre'
     ])
     
     tiene_telefono = any(palabra in texto_lower for palabra in [
         'mi teléfono', 'mi telefono', 'mi número', 'mi numero', 'my phone', 'my number',
-        'mein telefon', 'meine nummer'
+        'mein telefon', 'meine nummer', 'tfno', 'telefono', 'teléfono', 'numero', 'número'
     ]) or bool(re.search(r'\d{3}.*\d{3}.*\d{3}', texto))  # Detecta patrones de teléfono
     
     # Si tiene ambos o al menos uno muy claro
     if tiene_nombre and tiene_telefono:
         return True
     
-    # Detectar si hay números de teléfono en el texto
-    if re.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{3,4}', texto):
+    # Detectar si hay números de teléfono largos en el texto (6+ dígitos consecutivos)
+    if re.search(r'\d{6,}', texto):
         return True
     
     # Detectar formato español común
     if re.search(r'6\d{8}|9\d{8}|[+]34\s*6\d{8}|[+]34\s*9\d{8}', texto):
+        return True
+    
+    # Detectar patrón: "nombre + número" en el mismo mensaje
+    palabras = texto.split()
+    tiene_numero_largo = any(re.search(r'\d{6,}', palabra) for palabra in palabras)
+    tiene_palabra_nombre = any(palabra in ['es', 'soy', 'me', 'llamo', 'nombre'] for palabra in palabras[:3])
+    
+    if tiene_numero_largo and (tiene_palabra_nombre or len(palabras) <= 6):
         return True
     
     return False
