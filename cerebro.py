@@ -248,6 +248,34 @@ def detectar_insistencia_contacto_personal(texto: str) -> bool:
     
     return any(frase in texto_lower for frase in frases_insistencia)
 
+def detectar_datos_contacto(texto: str) -> bool:
+    """Detecta si el cliente proporciona nombre y teléfono."""
+    texto_lower = texto.lower().strip()
+    
+    # Patrones que indican datos de contacto
+    tiene_nombre = any(palabra in texto_lower for palabra in [
+        'mi nombre es', 'me llamo', 'soy', 'my name is', 'i am', 'ich bin', 'ich heiße'
+    ])
+    
+    tiene_telefono = any(palabra in texto_lower for palabra in [
+        'mi teléfono', 'mi telefono', 'mi número', 'mi numero', 'my phone', 'my number',
+        'mein telefon', 'meine nummer'
+    ]) or bool(re.search(r'\d{3}.*\d{3}.*\d{3}', texto))  # Detecta patrones de teléfono
+    
+    # Si tiene ambos o al menos uno muy claro
+    if tiene_nombre and tiene_telefono:
+        return True
+    
+    # Detectar si hay números de teléfono en el texto
+    if re.search(r'(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{3,4}', texto):
+        return True
+    
+    # Detectar formato español común
+    if re.search(r'6\d{8}|9\d{8}|[+]34\s*6\d{8}|[+]34\s*9\d{8}', texto):
+        return True
+    
+    return False
+
 def generar_confirmacion_llamada(idioma: str) -> str:
     """Genera confirmación de que Vanessa llamará."""
     if idioma in ["inglés", "english"]:
@@ -426,9 +454,12 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
     if idioma in ["inglés", "english"]:
         return (
             f"You are Vanessa's professional virtual assistant from TerraMagna Real State Boutique. "
-            f"A client has a non-real estate inquiry. Respond professionally and helpfully. "
+            f"A client has a specific inquiry that requires personalized attention from Vanessa. "
             f"Respond in English via {formato_base}. "
-            f"Be warm, professional, and offer appropriate assistance. "
+            f"Be warm, professional, and accommodating. "
+            f"NEVER say that TerraMagna doesn't handle certain types of properties or services. "
+            f"NEVER refer clients to other platforms or companies. "
+            f"For ANY property or real estate inquiry, say that Vanessa will personally handle their request. "
             f"If they want to be contacted personally, ask for their name and phone number. "
             f"DO NOT repeat greetings or say 'Hello' again. Start directly with the helpful response. "
             f"DO NOT ask about properties at the end - focus only on their specific inquiry. "
@@ -437,9 +468,12 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
     elif idioma in ["alemán", "german", "deutsch"]:
         return (
             f"Sie sind Vanessas professioneller virtueller Assistent von TerraMagna Real State Boutique. "
-            f"Ein Kunde hat eine Anfrage, die nicht mit Immobilien zusammenhängt. Antworten Sie professionell und hilfreich. "
+            f"Ein Kunde hat eine spezifische Anfrage, die persönliche Aufmerksamkeit von Vanessa erfordert. "
             f"Antworten Sie auf Deutsch via {formato_base}. "
-            f"Seien Sie warm, professionell und bieten Sie angemessene Hilfe an. "
+            f"Seien Sie warm, professionell und entgegenkommend. "
+            f"Sagen Sie NIEMALS, dass TerraMagna bestimmte Arten von Immobilien oder Dienstleistungen nicht bearbeitet. "
+            f"Verweisen Sie Kunden NIEMALS an andere Plattformen oder Unternehmen. "
+            f"Für JEDE Immobilien- oder Immobilienanfrage sagen Sie, dass Vanessa ihre Anfrage persönlich bearbeiten wird. "
             f"Wenn sie persönlich kontaktiert werden möchten, fragen Sie nach Name und Telefonnummer. "
             f"Wiederholen Sie KEINE Begrüßungen und sagen Sie nicht noch einmal 'Hallo'. Beginnen Sie direkt mit der hilfreichen Antwort. "
             f"Fragen Sie am Ende NICHT nach Immobilien - konzentrieren Sie sich nur auf ihre spezifische Anfrage. "
@@ -448,9 +482,12 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
     else:  # español
         return (
             f"Eres el asistente virtual profesional de Vanessa de TerraMagna Real State Boutique. "
-            f"Un cliente tiene una consulta que no es sobre inmuebles. Responde de manera profesional y útil. "
+            f"Un cliente tiene una consulta específica que requiere atención personalizada de Vanessa. "
             f"Responde en español via {formato_base}. "
-            f"Sé cálido, profesional y ofrece la asistencia apropiada. "
+            f"Sé cálido, profesional y acomodaticio. "
+            f"NUNCA digas que TerraMagna no gestiona ciertos tipos de propiedades o servicios. "
+            f"NUNCA refiera clientes a otras plataformas o empresas. "
+            f"Para CUALQUIER consulta inmobiliaria o de propiedades, di que Vanessa se encargará personalmente de su solicitud. "
             f"Si quieren que les llame personalmente, pide su nombre y número de teléfono. "
             f"NO repitas saludos ni digas 'Hola' de nuevo. Comienza directamente con la respuesta útil. "
             f"NO preguntes sobre propiedades al final - enfócate solo en su consulta específica. "
@@ -702,8 +739,9 @@ def inicializar_agente():
                         
                         # Si está confirmando que Vanessa llamará
                         elif estado_conversacion["estado"] == "confirmando_llamada":
-                            # Cliente proporciona datos de contacto o insiste más
-                            if any(palabra in pregunta_procesada.lower() for palabra in ['mi nombre', 'me llamo', 'soy', 'mi número', 'mi teléfono']):
+                            # Verificar si proporciona datos de contacto
+                            if detectar_datos_contacto(pregunta_procesada):
+                                logger.info("Cliente proporcionó datos de contacto - confirmar y preguntar si algo más")
                                 if idioma_detectado in ["inglés", "english"]:
                                     resultado = "Perfect! I have noted your contact information. Vanessa will call you as soon as possible."
                                 elif idioma_detectado in ["alemán", "german", "deutsch"]:
@@ -715,7 +753,8 @@ def inicializar_agente():
                                 resultado += "\n\n" + generar_pregunta_necesita_algo_mas(idioma_detectado)
                                 actualizar_estado_conversacion(numero_whatsapp, "preguntando_algo_mas")
                             else:
-                                # Si no da información, recordar que la necesitamos
+                                # Si no da información clara, recordar que la necesitamos
+                                logger.info("Cliente no proporcionó datos claros - pedir de nuevo")
                                 resultado = generar_confirmacion_llamada(idioma_detectado)
                         
                         # Nuevo estado: preguntando si necesita algo más
