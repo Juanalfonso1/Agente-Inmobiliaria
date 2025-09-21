@@ -179,7 +179,9 @@ def obtener_estado_conversacion(numero_whatsapp: str) -> dict:
         estados_conversacion[numero_whatsapp] = {
             "estado": "inicial",
             "ultima_interaccion": datetime.now(),
-            "contador_mensajes": 0
+            "contador_mensajes": 0,
+            "idioma_detectado": None,
+            "bandera_mostrada": False
         }
     
     return estados_conversacion[numero_whatsapp]
@@ -228,6 +230,36 @@ def generar_pregunta_seguimiento(idioma: str) -> str:
     else:  # español
         return "¿Hay algo más en lo que pueda ayudarte? ¿Te gustaría conocer nuestras propiedades en alquiler o venta?"
 
+def detectar_insistencia_contacto_personal(texto: str) -> bool:
+    """Detecta si el cliente insiste en hablar con Vanessa después de haber recibido respuesta de otro tema."""
+    texto_lower = texto.lower().strip()
+    
+    frases_insistencia = [
+        'nada le puedes decir a vanessa que me llame',
+        'le puedes decir a vanessa que me llame',
+        'dile a vanessa que me llame',
+        'que me llame vanessa',
+        'vanessa que me llame',
+        'solo quiero que me llame',
+        'necesito que me llame',
+        'cuando me va a llamar',
+        'cuándo me llama'
+    ]
+    
+    return any(frase in texto_lower for frase in frases_insistencia)
+
+def generar_confirmacion_llamada(idioma: str) -> str:
+    """Genera confirmación de que Vanessa llamará."""
+    if idioma in ["inglés", "english"]:
+        return ("Perfect! I will let Vanessa know that you want her to call you. "
+                "Please provide your name and phone number so she can contact you as soon as possible.")
+    elif idioma in ["alemán", "german", "deutsch"]:
+        return ("Perfekt! Ich werde Vanessa mitteilen, dass Sie möchten, dass sie Sie anruft. "
+                "Bitte geben Sie Ihren Namen und Ihre Telefonnummer an, damit sie Sie so schnell wie möglich kontaktieren kann.")
+    else:  # español
+        return ("¡Perfecto! Le diré a Vanessa que quieres que te llame. "
+                "Por favor, proporciona tu nombre y número de teléfono para que pueda contactarte lo antes posible.")
+
 def detectar_finalizacion_conversacion(texto: str) -> bool:
     """Detecta si el cliente quiere finalizar la conversación."""
     texto_lower = texto.lower().strip()
@@ -243,6 +275,56 @@ def detectar_finalizacion_conversacion(texto: str) -> bool:
         return True
     
     return False
+
+def generar_pregunta_necesita_algo_mas(idioma: str) -> str:
+    """Pregunta si necesita algo más después de que explique sus necesidades."""
+    if idioma in ["inglés", "english"]:
+        return "Is there anything else I can help you with today?"
+    elif idioma in ["alemán", "german", "deutsch"]:
+        return "Gibt es noch etwas anderes, womit ich Ihnen heute helfen kann?"
+    else:  # español
+        return "¿Hay algo más en lo que pueda ayudarte hoy?"
+
+def generar_despedida_final(idioma: str) -> str:
+    """Genera despedida final cuando el cliente no necesita más ayuda."""
+    if idioma in ["inglés", "english"]:
+        return ("Thank you for contacting TerraMagna Real State Boutique. "
+                "We are always at your disposal for any questions or needs you may have. "
+                "Have a wonderful day!")
+    elif idioma in ["alemán", "german", "deutsch"]:
+        return ("Vielen Dank, dass Sie TerraMagna Real State Boutique kontaktiert haben. "
+                "Wir stehen Ihnen jederzeit für Fragen oder Bedürfnisse zur Verfügung. "
+                "Haben Sie einen wunderschönen Tag!")
+    else:  # español
+        return ("Gracias por contactar con TerraMagna Real State Boutique. "
+                "Estamos siempre a tu disposición para cualquier consulta o necesidad que puedas tener. "
+                "¡Que tengas un día maravilloso!")
+
+def detectar_respuesta_negativa(texto: str) -> bool:
+    """Detecta si el cliente dice que no necesita más ayuda."""
+    texto_lower = texto.lower().strip()
+    
+    respuestas_negativas = [
+        'no', 'nada', 'nothing', 'nichts', 'no thanks', 'no gracias', 
+        'nein danke', 'that\'s all', 'eso es todo', 'das ist alles',
+        'no necesito nada más', 'no necesito más', 'estoy bien',
+        'i\'m good', 'i\'m fine', 'that\'s it', 'ya está'
+    ]
+    
+    return any(resp in texto_lower for resp in respuestas_negativas)
+
+def aplicar_bandera_si_necesario(respuesta: str, idioma: str, numero_whatsapp: str) -> str:
+    """Aplica bandera solo si es el primer mensaje de la conversación."""
+    estado = obtener_estado_conversacion(numero_whatsapp)
+    
+    if not estado.get("bandera_mostrada", False):
+        # Primera vez, mostrar bandera
+        estados_conversacion[numero_whatsapp]["bandera_mostrada"] = True
+        estados_conversacion[numero_whatsapp]["idioma_detectado"] = idioma
+        return agregar_bandera(respuesta, idioma)
+    else:
+        # Ya se mostró la bandera, no agregar más
+        return respuesta
 
 def agregar_bandera(respuesta: str, idioma: str) -> str:
     """Agrega bandera según el idioma detectado."""
@@ -563,8 +645,13 @@ def inicializar_agente():
                         
                         # Si estamos esperando seguimiento después de una respuesta
                         elif estado_conversacion["estado"] == "esperando_seguimiento":
+                            # Verificar primero si insiste en contacto personal
+                            if detectar_insistencia_contacto_personal(pregunta_procesada):
+                                logger.info("Cliente insiste en contacto con Vanessa - confirmar llamada")
+                                actualizar_estado_conversacion(numero_whatsapp, "confirmando_llamada")
+                                resultado = generar_confirmacion_llamada(idioma_detectado)
                             # Verificar si quiere finalizar o continuar
-                            if detectar_finalizacion_conversacion(pregunta_procesada):
+                            elif detectar_finalizacion_conversacion(pregunta_procesada):
                                 # Cliente agradece o dice que está bien
                                 if idioma_detectado in ["inglés", "english"]:
                                     resultado = "You're welcome! Don't hesitate to contact us if you need anything else. Have a great day! 😊"
@@ -576,6 +663,7 @@ def inicializar_agente():
                             else:
                                 # Detectar nueva categoría
                                 nueva_categoria = detectar_respuesta_categoria(pregunta_procesada)
+                                logger.info(f"Nueva categoría en seguimiento: {nueva_categoria}")
                                 
                                 if nueva_categoria == "inmobiliario":
                                     actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
@@ -585,6 +673,7 @@ def inicializar_agente():
                                     resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
                                     actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
                                 elif nueva_categoria == "otro_tema":
+                                    logger.info("Cliente vuelve a otro tema - derivar a Vanessa")
                                     actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
                                     resultado = generar_respuesta_otro_tema(idioma_detectado)
                                 else:
@@ -596,26 +685,83 @@ def inicializar_agente():
                                     else:
                                         resultado = "¿Sobre qué te gustaría saber más? ¿Nuestras propiedades en alquiler, propiedades en venta, o algo más?"
                         
+                        # Si está confirmando que Vanessa llamará
+                        elif estado_conversacion["estado"] == "confirmando_llamada":
+                            # Cliente proporciona datos de contacto o insiste más
+                            if any(palabra in pregunta_procesada.lower() for palabra in ['mi nombre', 'me llamo', 'soy', 'mi número', 'mi teléfono']):
+                                if idioma_detectado in ["inglés", "english"]:
+                                    resultado = "Perfect! I have noted your contact information. Vanessa will call you as soon as possible."
+                                elif idioma_detectado in ["alemán", "german", "deutsch"]:
+                                    resultado = "Perfekt! Ich habe Ihre Kontaktdaten notiert. Vanessa wird Sie so schnell wie möglich anrufen."
+                                else:
+                                    resultado = "¡Perfecto! He anotado tu información de contacto. Vanessa te llamará lo antes posible."
+                                
+                                # Preguntar si necesita algo más
+                                resultado += "\n\n" + generar_pregunta_necesita_algo_mas(idioma_detectado)
+                                actualizar_estado_conversacion(numero_whatsapp, "preguntando_algo_mas")
+                            else:
+                                # Si no da información, recordar que la necesitamos
+                                resultado = generar_confirmacion_llamada(idioma_detectado)
+                        
+                        # Nuevo estado: preguntando si necesita algo más
+                        elif estado_conversacion["estado"] == "preguntando_algo_mas":
+                            if detectar_respuesta_negativa(pregunta_procesada):
+                                # Cliente dice que no necesita más ayuda
+                                resultado = generar_despedida_final(idioma_detectado)
+                                actualizar_estado_conversacion(numero_whatsapp, "finalizado")
+                            else:
+                                # Cliente dice que sí o hace otra consulta
+                                nueva_categoria = detectar_respuesta_categoria(pregunta_procesada)
+                                
+                                if nueva_categoria == "inmobiliario":
+                                    actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
+                                    consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+                                    respuesta = qa.invoke({"query": consulta})
+                                    resultado_base = respuesta.get("result", str(respuesta))
+                                    resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
+                                    actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
+                                elif nueva_categoria == "otro_tema":
+                                    actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
+                                    consulta = crear_prompt_para_otro_tema(pregunta_procesada, idioma_detectado, plataforma)
+                                    respuesta = qa.invoke({"query": consulta})
+                                    resultado_base = respuesta.get("result", str(respuesta))
+                                    resultado = resultado_base + "\n\n" + generar_pregunta_necesita_algo_mas(idioma_detectado)
+                                    actualizar_estado_conversacion(numero_whatsapp, "preguntando_algo_mas")
+                                else:
+                                    # Si no está claro, preguntar qué necesita específicamente
+                                    if idioma_detectado in ["inglés", "english"]:
+                                        resultado = "What specifically would you like help with?"
+                                    elif idioma_detectado in ["alemán", "german", "deutsch"]:
+                                        resultado = "Womit genau möchten Sie Hilfe?"
+                                    else:
+                                        resultado = "¿Con qué específicamente te gustaría que te ayude?"
+                        
                         # Si está en otro tema pero puede cambiar de opinión
                         elif estado_conversacion["estado"] == "otro_tema_finalizado":
-                            # Verificar si ahora menciona inmobiliario
-                            nueva_categoria = detectar_respuesta_categoria(pregunta_procesada)
-                            
-                            if nueva_categoria == "inmobiliario":
-                                actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
-                                consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                respuesta = qa.invoke({"query": consulta})
-                                resultado_base = respuesta.get("result", str(respuesta))
-                                resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
-                                actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
+                            # Verificar primero si insiste en que Vanessa le llame
+                            if detectar_insistencia_contacto_personal(pregunta_procesada):
+                                logger.info("Cliente insiste en llamada después de otro tema - confirmar")
+                                actualizar_estado_conversacion(numero_whatsapp, "confirmando_llamada")
+                                resultado = generar_confirmacion_llamada(idioma_detectado)
                             else:
-                                # Si sigue siendo otro tema, responder específicamente sin repetir bienvenida
-                                logger.info("Cliente continúa con otro tema - respuesta directa")
-                                consulta = crear_prompt_para_otro_tema(pregunta_procesada, idioma_detectado, plataforma)
-                                respuesta = qa.invoke({"query": consulta})
-                                resultado_base = respuesta.get("result", str(respuesta))
-                                resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
-                                actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
+                                # Verificar si ahora menciona inmobiliario
+                                nueva_categoria = detectar_respuesta_categoria(pregunta_procesada)
+                                
+                                if nueva_categoria == "inmobiliario":
+                                    actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
+                                    consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+                                    respuesta = qa.invoke({"query": consulta})
+                                    resultado_base = respuesta.get("result", str(respuesta))
+                                    resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
+                                    actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
+                                else:
+                                    # Si sigue siendo otro tema, responder específicamente sin repetir bienvenida
+                                    logger.info("Cliente continúa con otro tema - respuesta directa")
+                                    consulta = crear_prompt_para_otro_tema(pregunta_procesada, idioma_detectado, plataforma)
+                                    respuesta = qa.invoke({"query": consulta})
+                                    resultado_base = respuesta.get("result", str(respuesta))
+                                    resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
+                                    actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
                         
                         # Si ya finalizó pero escribe de nuevo
                         elif estado_conversacion["estado"] == "finalizado":
@@ -648,7 +794,11 @@ def inicializar_agente():
                     # Formatear según plataforma
                     resultado_formateado = formatear_respuesta_por_plataforma(resultado, plataforma)
                     
-                    return agregar_bandera(resultado_formateado, idioma_detectado)
+                    # Aplicar bandera solo en el primer mensaje si es WhatsApp
+                    if plataforma.lower() == "whatsapp" and numero_whatsapp:
+                        return aplicar_bandera_si_necesario(resultado_formateado, idioma_detectado, numero_whatsapp)
+                    else:
+                        return resultado_formateado
                     
                 except Exception as e:
                     logger.error(f"Error en agente con documentos: {e}")
@@ -735,7 +885,11 @@ def inicializar_agente():
                     response = llm.invoke(consulta)
                     resultado_formateado = formatear_respuesta_por_plataforma(response.content, plataforma)
                     
-                    return agregar_bandera(resultado_formateado, idioma_detectado)
+                    # Aplicar bandera solo en el primer mensaje si es WhatsApp
+                    if plataforma.lower() == "whatsapp" and numero_whatsapp:
+                        return aplicar_bandera_si_necesario(resultado_formateado, idioma_detectado, numero_whatsapp)
+                    else:
+                        return resultado_formateado
                     
                 except Exception as e:
                     logger.error(f"Error en agente sin documentos: {e}")
