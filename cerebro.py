@@ -1,5 +1,4 @@
-                        elif estado_conversacion["estado"] == "otro_tema_finalizado":
-                            # El cliente está# cerebro_inmobiliaria_optimizado.py - VERSIÓN FINAL CON LÓGICA DE CONVERSACIÓN
+# cerebro.py - VERSIÓN FINAL OPTIMIZADA PARA TERRAMAGNA
 
 import os
 import re
@@ -79,29 +78,51 @@ def detectar_intencion_inicial(texto: str) -> str:
     # Palabras que indican saludo inicial simple
     saludos_simples = ['hola', 'hello', 'hi', 'buenos días', 'buenas tardes', 'buenas noches', 'hey', 'buenas']
     
-    # Palabras que indican intención de propiedades
-    inmobiliario = ['alquiler', 'venta', 'casa', 'piso', 'apartamento', 'propiedad', 'inmueble', 
-                   'rent', 'sale', 'house', 'apartment', 'property', 'comprar', 'rentar', 'vender']
+    # Palabras que indican consulta específica sobre propiedades DISPONIBLES
+    inmobiliario_especifico = [
+        'tiene propiedades', 'tienen propiedades', 'propiedades disponibles',
+        'casas disponibles', 'pisos disponibles', 'apartamentos disponibles',
+        'propiedades en alquiler', 'propiedades en venta', 'busco casa', 'busco piso',
+        'necesito casa', 'necesito piso', 'quiero alquilar', 'quiero comprar'
+    ]
+    
+    # Palabras que indican ASESORAMIENTO o consulta personal
+    asesoramiento = [
+        'aconsejar', 'aconseje', 'asesoramiento', 'asesorar', 'ayuda para invertir',
+        'consejos', 'consulta para invertir', 'quiero invertir', 'cómo invertir',
+        'donde invertir', 'orientación', 'guía', 'recomendar zona'
+    ]
     
     # Palabras que indican otros temas específicos
-    otros_temas = ['consulta legal', 'información legal', 'servicio legal', 'ayuda legal', 'contacto', 'vanessa', 
-                   'llamar', 'llame', 'teléfono', 'telefono', 'call', 'phone']
+    otros_temas = [
+        'consulta legal', 'información legal', 'servicio legal', 'ayuda legal', 
+        'contacto', 'vanessa', 'llamar', 'llame', 'teléfono', 'telefono', 
+        'call', 'phone', 'hablar con vanessa'
+    ]
     
     # Si es exactamente un saludo simple sin más contexto
     if texto_lower in saludos_simples or (any(saludo in texto_lower for saludo in saludos_simples) and len(texto.split()) <= 2):
         return "saludo_inicial"
     
-    # Verificar si contiene palabras inmobiliarias específicas
-    if any(palabra in texto_lower for palabra in inmobiliario):
+    # PRIORIDAD: Detectar asesoramiento personal primero
+    if any(palabra in texto_lower for palabra in asesoramiento):
+        return "otro_tema"
+    
+    # Detectar consulta específica sobre propiedades disponibles
+    if any(frase in texto_lower for frase in inmobiliario_especifico):
         return "inmobiliario_directo"
     
-    # Verificar si menciona otros temas específicamente (incluye solicitudes de llamada)
+    # Detectar otros temas específicamente
     if any(tema in texto_lower for tema in otros_temas):
         return "otro_tema"
     
-    # Si el mensaje es más largo o tiene contenido específico, NO es saludo inicial
+    # Si el mensaje es más largo o tiene contenido específico, analizar contexto
     if len(texto.split()) > 3:
-        return "otro_tema"
+        # Si menciona inversión sin preguntar por propiedades específicas
+        if 'invertir' in texto_lower or 'inversión' in texto_lower:
+            return "otro_tema"
+        else:
+            return "otro_tema"
     
     return "saludo_inicial"
 
@@ -127,7 +148,7 @@ def detectar_respuesta_categoria(texto: str) -> str:
         'mejor zona para', 'dónde es mejor', 'advice', 'consult', 'recommend'
     ]
     
-    # Palabras que indican otro tema claramente
+    # Palabras que indican otro tema claramente (incluye solicitudes de llamada)
     palabras_otro_tema = [
         'otro tema', 'otra cosa', 'diferente', 'consulta legal', 'información legal', 
         'servicio legal', 'no', 'nada', 'otro asunto', 'legal', 'jurídico',
@@ -234,33 +255,6 @@ def generar_confirmacion_consulta_anotada(idioma: str) -> str:
         return ("Gracias por los detalles. He anotado todo para Vanessa. "
                 "Para que pueda contactarte personalmente, por favor proporciona tu nombre y número de teléfono.")
 
-def generar_pregunta_seguimiento(idioma: str) -> str:
-    """Genera pregunta de seguimiento después de una respuesta."""
-    if idioma in ["inglés", "english"]:
-        return "Is there anything else I can help you with? Would you like to know about our rental or sale properties?"
-    elif idioma in ["alemán", "german", "deutsch"]:
-        return "Gibt es noch etwas, womit ich Ihnen helfen kann? Möchten Sie mehr über unsere Miet- oder Verkaufsimmobilien erfahren?"
-    else:  # español
-        return "¿Hay algo más en lo que pueda ayudarte? ¿Te gustaría conocer nuestras propiedades en alquiler o venta?"
-
-def detectar_insistencia_contacto_personal(texto: str) -> bool:
-    """Detecta si el cliente insiste en hablar con Vanessa después de haber recibido respuesta de otro tema."""
-    texto_lower = texto.lower().strip()
-    
-    frases_insistencia = [
-        'nada le puedes decir a vanessa que me llame',
-        'le puedes decir a vanessa que me llame',
-        'dile a vanessa que me llame',
-        'que me llame vanessa',
-        'vanessa que me llame',
-        'solo quiero que me llame',
-        'necesito que me llame',
-        'cuando me va a llamar',
-        'cuándo me llama'
-    ]
-    
-    return any(frase in texto_lower for frase in frases_insistencia)
-
 def detectar_datos_contacto(texto: str) -> bool:
     """Detecta si el cliente proporciona nombre y teléfono."""
     texto_lower = texto.lower().strip()
@@ -301,39 +295,32 @@ def generar_confirmacion_llamada(idioma: str) -> str:
         return ("¡Perfecto! Le diré a Vanessa que quieres que te llame. "
                 "Por favor, proporciona tu nombre y número de teléfono para que pueda contactarte lo antes posible.")
 
-def detectar_finalizacion_conversacion(texto: str) -> bool:
-    """Detecta si el cliente quiere finalizar la conversación."""
+def detectar_insistencia_contacto_personal(texto: str) -> bool:
+    """Detecta si el cliente insiste en hablar con Vanessa después de haber recibido respuesta de otro tema."""
     texto_lower = texto.lower().strip()
     
-    palabras_finalizacion = [
-        'gracias', 'thank you', 'thanks', 'danke', 'perfecto', 'perfect',
-        'ok', 'vale', 'bien', 'good', 'gut', 'nada más', 'nothing else',
-        'nichts mehr', 'eso es todo', "that's all", 'das ist alles'
+    frases_insistencia = [
+        'nada le puedes decir a vanessa que me llame',
+        'le puedes decir a vanessa que me llame',
+        'dile a vanessa que me llame',
+        'que me llame vanessa',
+        'vanessa que me llame',
+        'solo quiero que me llame',
+        'necesito que me llame',
+        'cuando me va a llamar',
+        'cuándo me llama'
     ]
     
-    # Si es una respuesta muy corta con palabras de agradecimiento
-    if len(texto.split()) <= 3 and any(palabra in texto_lower for palabra in palabras_finalizacion):
-        return True
-    
-    return False
+    return any(frase in texto_lower for frase in frases_insistencia)
 
-def generar_pregunta_es_todo(idioma: str) -> str:
-    """Pregunta si eso es todo lo que quería comentar."""
+def generar_pregunta_seguimiento(idioma: str) -> str:
+    """Genera pregunta de seguimiento después de una respuesta."""
     if idioma in ["inglés", "english"]:
-        return "Is that everything you wanted to discuss?"
+        return "Is there anything else I can help you with? Would you like to know about our rental or sale properties?"
     elif idioma in ["alemán", "german", "deutsch"]:
-        return "Ist das alles, was Sie besprechen wollten?"
+        return "Gibt es noch etwas, womit ich Ihnen helfen kann? Möchten Sie mehr über unsere Miet- oder Verkaufsimmobilien erfahren?"
     else:  # español
-        return "¿Es todo lo que querías comentar?"
-
-def generar_continuar_explicando(idioma: str) -> str:
-    """Invita al cliente a continuar explicando."""
-    if idioma in ["inglés", "english"]:
-        return "Please continue, I'm listening."
-    elif idioma in ["alemán", "german", "deutsch"]:
-        return "Bitte fahren Sie fort, ich höre zu."
-    else:  # español
-        return "Por favor, continúa, te escucho."
+        return "¿Hay algo más en lo que pueda ayudarte? ¿Te gustaría conocer nuestras propiedades en alquiler o venta?"
 
 def generar_pregunta_necesita_algo_mas(idioma: str) -> str:
     """Pregunta si necesita algo más después de que explique sus necesidades."""
@@ -380,6 +367,22 @@ def detectar_respuesta_negativa(texto: str) -> bool:
     ]
     
     return any(resp in texto_lower for resp in respuestas_negativas)
+
+def detectar_finalizacion_conversacion(texto: str) -> bool:
+    """Detecta si el cliente quiere finalizar la conversación."""
+    texto_lower = texto.lower().strip()
+    
+    palabras_finalizacion = [
+        'gracias', 'thank you', 'thanks', 'danke', 'perfecto', 'perfect',
+        'ok', 'vale', 'bien', 'good', 'gut', 'nada más', 'nothing else',
+        'nichts mehr', 'eso es todo', "that's all", 'das ist alles'
+    ]
+    
+    # Si es una respuesta muy corta con palabras de agradecimiento
+    if len(texto.split()) <= 3 and any(palabra in texto_lower for palabra in palabras_finalizacion):
+        return True
+    
+    return False
 
 def aplicar_bandera_si_necesario(respuesta: str, idioma: str, numero_whatsapp: str) -> str:
     """Aplica bandera solo si es el primer mensaje de la conversación."""
@@ -524,42 +527,6 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
             f"NO preguntes sobre propiedades al final - enfócate solo en su consulta específica. "
             f"Consulta del cliente: {pregunta}"
         )
-    """Crea prompt optimizado para consultas inmobiliarias."""
-    
-    # Instrucciones base
-    if plataforma.lower() == "whatsapp":
-        formato_base = "WhatsApp (máx 3900 chars, emojis apropiados, *negritas* importantes)"
-    else:
-        formato_base = "web (respuesta completa, formato markdown si necesario)"
-    
-    # Prompts por idioma para consultas inmobiliarias
-    if idioma in ["inglés", "english"]:
-        return (
-            f"You are Vanessa's professional virtual assistant from TerraMagna Real State Boutique. "
-            f"You help clients with rental and sale property inquiries. "
-            f"Respond in English via {formato_base}. "
-            f"Be warm, professional, and helpful. Use property information from your knowledge base. "
-            f"Always try to understand what type of property the client is looking for and provide relevant options. "
-            f"Client question: {pregunta}"
-        )
-    elif idioma in ["alemán", "german", "deutsch"]:
-        return (
-            f"Sie sind Vanessas professioneller virtueller Assistent von TerraMagna Real State Boutique. "
-            f"Sie helfen Kunden bei Anfragen zu Miet- und Verkaufsimmobilien. "
-            f"Antworten Sie auf Deutsch via {formato_base}. "
-            f"Seien Sie warm, professionell und hilfreich. Verwenden Sie Immobilieninformationen aus Ihrer Wissensbasis. "
-            f"Versuchen Sie immer zu verstehen, welche Art von Immobilie der Kunde sucht, und bieten Sie relevante Optionen an. "
-            f"Kundenfrage: {pregunta}"
-        )
-    else:  # español
-        return (
-            f"Eres el asistente virtual profesional de Vanessa de TerraMagna Real State Boutique. "
-            f"Ayudas a clientes con consultas sobre propiedades en alquiler y venta. "
-            f"Responde en español via {formato_base}. "
-            f"Sé cálido, profesional y útil. Usa la información de propiedades de tu base de conocimientos. "
-            f"Siempre trata de entender qué tipo de propiedad busca el cliente y proporciona opciones relevantes. "
-            f"Pregunta del cliente: {pregunta}"
-        )
 
 def esta_en_horario_comercial() -> bool:
     """Verificación de horario comercial - SIEMPRE ACTIVO 24/7."""
@@ -685,7 +652,7 @@ def inicializar_agente():
                                 resultado = respuesta.get("result", str(respuesta))
                             elif intencion == "otro_tema":
                                 # Cliente menciona otro tema
-                                actualizar_estado_conversacion(numero_whatsapp, "otro_tema")
+                                actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
                                 resultado = generar_respuesta_otro_tema(idioma_detectado)
                             else:
                                 # Saludo inicial - preguntar qué necesita
@@ -787,17 +754,6 @@ def inicializar_agente():
                                 # Si no da información clara, recordar que la necesitamos
                                 logger.info("Cliente no proporcionó datos claros - pedir de nuevo")
                                 resultado = generar_confirmacion_llamada(idioma_detectado)
-                        
-                        # Nuevo estado: preguntando si es todo lo que quería comentar
-                        elif estado_conversacion["estado"] == "preguntando_si_es_todo":
-                            if detectar_respuesta_negativa(pregunta_procesada):
-                                # Cliente dice que sí, es todo - ofrecer propiedades antes de despedir
-                                resultado = generar_oferta_propiedades_final(idioma_detectado)
-                                actualizar_estado_conversacion(numero_whatsapp, "ofreciendo_propiedades_final")
-                            else:
-                                # Cliente dice que no, tiene más que comentar - invitar a continuar
-                                resultado = generar_continuar_explicando(idioma_detectado)
-                                actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
                         
                         # Nuevo estado: preguntando si necesita algo más
                         elif estado_conversacion["estado"] == "preguntando_algo_mas":
@@ -927,20 +883,20 @@ def inicializar_agente():
                             
                             if intencion == "otro_tema":
                                 actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
-                                return agregar_bandera(generar_respuesta_otro_tema(idioma_detectado), idioma_detectado)
+                                return aplicar_bandera_si_necesario(generar_respuesta_otro_tema(idioma_detectado), idioma_detectado, numero_whatsapp)
                             elif intencion == "inmobiliario_directo":
                                 actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
                                 # Continuar con consulta inmobiliaria y seguimiento
                             else:
                                 actualizar_estado_conversacion(numero_whatsapp, "esperando_categoria")
-                                return agregar_bandera(generar_saludo_inicial(idioma_detectado), idioma_detectado)
+                                return aplicar_bandera_si_necesario(generar_saludo_inicial(idioma_detectado), idioma_detectado, numero_whatsapp)
                         
                         elif estado_conversacion["estado"] == "esperando_categoria":
                             categoria = detectar_respuesta_categoria(pregunta_procesada)
                             
                             if categoria == "otro_tema":
                                 actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
-                                return agregar_bandera(generar_respuesta_otro_tema(idioma_detectado), idioma_detectado)
+                                return aplicar_bandera_si_necesario(generar_respuesta_otro_tema(idioma_detectado), idioma_detectado, numero_whatsapp)
                             else:
                                 actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
                                 # Continuar con consulta inmobiliaria
@@ -954,12 +910,12 @@ def inicializar_agente():
                                 else:
                                     resultado_final = "¡De nada! No dudes en contactarnos si necesitas algo más. ¡Que tengas un buen día! 😊"
                                 actualizar_estado_conversacion(numero_whatsapp, "finalizado")
-                                return agregar_bandera(resultado_final, idioma_detectado)
+                                return aplicar_bandera_si_necesario(resultado_final, idioma_detectado, numero_whatsapp)
                             
                             nueva_categoria = detectar_respuesta_categoria(pregunta_procesada)
                             if nueva_categoria == "otro_tema":
                                 actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
-                                return agregar_bandera(generar_respuesta_otro_tema(idioma_detectado), idioma_detectado)
+                                return aplicar_bandera_si_necesario(generar_respuesta_otro_tema(idioma_detectado), idioma_detectado, numero_whatsapp)
                             else:
                                 actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
                                 # Continuar con consulta inmobiliaria
@@ -970,7 +926,7 @@ def inicializar_agente():
                                 actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
                                 # Continuar con consulta inmobiliaria
                             else:
-                                return agregar_bandera(generar_respuesta_otro_tema(idioma_detectado), idioma_detectado)
+                                return aplicar_bandera_si_necesario(generar_respuesta_otro_tema(idioma_detectado), idioma_detectado, numero_whatsapp)
                         
                         elif estado_conversacion["estado"] == "finalizado":
                             # Reiniciar conversación
@@ -978,7 +934,7 @@ def inicializar_agente():
                             intencion = detectar_intencion_inicial(pregunta_procesada)
                             if intencion != "inmobiliario_directo":
                                 actualizar_estado_conversacion(numero_whatsapp, "esperando_categoria")
-                                return agregar_bandera(generar_saludo_inicial(idioma_detectado), idioma_detectado)
+                                return aplicar_bandera_si_necesario(generar_saludo_inicial(idioma_detectado), idioma_detectado, numero_whatsapp)
                     
                     consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
                     
