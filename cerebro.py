@@ -108,20 +108,30 @@ def detectar_respuesta_categoria(texto: str) -> str:
     """Detecta si la respuesta es sobre alquileres/ventas u otro tema."""
     texto_lower = texto.lower().strip()
     
-    # Palabras que indican interés en propiedades
-    palabras_inmobiliario = [
-        'alquiler', 'alquilar', 'venta', 'vender', 'comprar', 'casa', 'piso', 
-        'apartamento', 'propiedad', 'inmueble', 'vivienda', 'rent', 'rental',
-        'sale', 'buy', 'house', 'apartment', 'property', 'si', 'sí', 'yes',
-        'alquileres', 'ventas', 'propiedades'
+    # Palabras que indican consulta específica sobre propiedades DISPONIBLES
+    palabras_inmobiliario_especifico = [
+        'tiene propiedades', 'tienen propiedades', 'qué propiedades tienen', 'propiedades disponibles',
+        'casas disponibles', 'pisos disponibles', 'apartamentos disponibles',
+        'propiedades en alquiler', 'propiedades en venta', 'casas en alquiler', 'casas en venta',
+        'pisos en alquiler', 'pisos en venta', 'apartamentos en alquiler', 'apartamentos en venta',
+        'mostrar propiedades', 'ver propiedades', 'busco casa', 'busco piso', 'busco apartamento',
+        'necesito casa', 'necesito piso', 'necesito apartamento'
     ]
     
-    # Palabras que indican otro tema claramente (incluye solicitudes de llamada)
+    # Palabras que indican ASESORAMIENTO o consulta personal (otro tema)
+    palabras_asesoria_personal = [
+        'aconsejar', 'aconseje', 'asesoramiento', 'asesorar', 'ayuda para invertir',
+        'consejos', 'consulta para invertir', 'quiero invertir', 'cómo invertir',
+        'donde invertir', 'orientación', 'guía', 'recomendar zona', 'recomendar área',
+        'mejor zona para', 'dónde es mejor', 'advice', 'consult', 'recommend'
+    ]
+    
+    # Palabras que indican otro tema claramente
     palabras_otro_tema = [
         'otro tema', 'otra cosa', 'diferente', 'consulta legal', 'información legal', 
         'servicio legal', 'no', 'nada', 'otro asunto', 'legal', 'jurídico',
         'llamar', 'llame', 'teléfono', 'telefono', 'call', 'phone', 'contacto',
-        'hablar', 'conversar', 'consulta personal', 'quiero que me llame'
+        'hablar con vanessa', 'contactar vanessa', 'hablar', 'conversar'
     ]
     
     # Frases que indican seguimiento o más preguntas
@@ -130,17 +140,38 @@ def detectar_respuesta_categoria(texto: str) -> str:
         'gracias', 'perfecto', 'ok', 'vale', 'bien'
     ]
     
-    if any(tema in texto_lower for tema in palabras_otro_tema):
+    # PRIORIDAD: Detectar primero si es asesoramiento personal
+    if any(palabra in texto_lower for palabra in palabras_asesoria_personal):
         return "otro_tema"
-    elif any(palabra in texto_lower for palabra in palabras_inmobiliario):
+    
+    # Detectar si pregunta específicamente por propiedades disponibles
+    elif any(frase in texto_lower for frase in palabras_inmobiliario_especifico):
         return "inmobiliario"
+    
+    # Detectar otros temas
+    elif any(tema in texto_lower for tema in palabras_otro_tema):
+        return "otro_tema"
+    
+    # Detectar seguimiento
     elif any(palabra in texto_lower for palabra in palabras_seguimiento):
         return "seguimiento"
+    
+    # Si menciona propiedades pero en contexto de asesoramiento
+    elif 'invertir' in texto_lower or 'inversión' in texto_lower:
+        return "otro_tema"
+    
     else:
-        # Si menciona algo específico pero no está claro, tratar como otro tema
-        if len(texto.split()) > 4:
+        # Si es una pregunta específica y directa sobre propiedades
+        palabras_inmobiliario_general = [
+            'alquiler', 'alquilar', 'venta', 'vender', 'comprar', 'casa', 'piso', 
+            'apartamento', 'propiedad', 'inmueble', 'vivienda', 'rent', 'rental',
+            'sale', 'buy', 'house', 'apartment', 'property', 'alquileres', 'ventas'
+        ]
+        
+        if any(palabra in texto_lower for palabra in palabras_inmobiliario_general):
+            return "inmobiliario"
+        else:
             return "otro_tema"
-        return "inmobiliario"  # Por defecto asumir inmobiliario para respuestas cortas
 
 def obtener_estado_conversacion(numero_whatsapp: str) -> dict:
     """Obtiene el estado actual de la conversación."""
@@ -501,9 +532,10 @@ def inicializar_agente():
                         # Si estamos esperando que elija categoría
                         elif estado_conversacion["estado"] == "esperando_categoria":
                             categoria = detectar_respuesta_categoria(pregunta_procesada)
-                            logger.info(f"Categoría detectada: {categoria}")
+                            logger.info(f"Categoría detectada: {categoria} para mensaje: '{pregunta_procesada}'")
                             
                             if categoria == "inmobiliario":
+                                logger.info("Procesando como consulta inmobiliaria específica")
                                 actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
                                 consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
                                 respuesta = qa.invoke({"query": consulta})
@@ -512,10 +544,12 @@ def inicializar_agente():
                                 resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
                                 actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
                             elif categoria == "otro_tema":
+                                logger.info("Procesando como asesoramiento personal - derivar a Vanessa")
                                 actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
                                 resultado = generar_respuesta_otro_tema(idioma_detectado)
                             else:
                                 # Si no está claro, preguntar de nuevo
+                                logger.info("Categoría no clara, repitiendo saludo")
                                 resultado = generar_saludo_inicial(idioma_detectado)
                         
                         # Si ya estamos en modo inmobiliario
