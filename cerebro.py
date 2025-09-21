@@ -164,7 +164,7 @@ def generar_resumen_consultas() -> str:
         resumen += f"👤 Nombre: {datos.get('nombre', 'No proporcionado')}\n"
         resumen += f"📅 Fecha: {datos.get('fecha', 'N/A')}\n"
         resumen += f"💬 Consulta: {datos.get('mensaje', 'N/A')}\n"
-        resumen += f"🌐 Idioma: {datos.get('idioma', 'No detectado')}\n"
+        resumen += f"🌍 Idioma: {datos.get('idioma', 'No detectado')}\n"
         resumen += "─" * 30 + "\n\n"
     
     resumen += f"📊 *Total de consultas: {len(consultas_vanessa)}*"
@@ -334,13 +334,13 @@ def actualizar_estado_conversacion(numero_whatsapp: str, nuevo_estado: str):
 def generar_saludo_inicial(idioma: str) -> str:
     """Genera el saludo inicial según el idioma - MENSAJE EXACTO REQUERIDO."""
     if idioma in ["inglés", "english"]:
-        return ("🏠 Hello! I'm Vanessa's virtual assistant from TerraMagna Real State Boutique. "
+        return ("🏠 Hello! I'm Vanessa's virtual assistant from Terra Magna Real Estate Boutique. "
                 "Are you looking to inquire about rental or sale properties? Or is it about another topic?")
     elif idioma in ["alemán", "german", "deutsch"]:
-        return ("🏠 Hallo! Ich bin Vanessas virtueller Assistent von TerraMagna Real State Boutique. "
+        return ("🏠 Hallo! Ich bin Vanessas virtueller Assistent von Terra Magna Real Estate Boutique. "
                 "Möchten Sie sich über Miet- oder Verkaufsimmobilien informieren? Oder geht es um ein anderes Thema?")
     else:  # español
-        return ("🏠 Hola, soy el asistente virtual de Vanessa de TerraMagna Real State Boutique. "
+        return ("🏠 Hola, soy el asistente virtual de Vanessa de Terra Magna Real Estate Boutique. "
                 "¿Quieres consultar sobre propiedades en alquiler o en venta? ¿O es por otro tema?")
 
 def generar_respuesta_otro_tema(idioma: str) -> str:
@@ -491,15 +491,15 @@ def generar_oferta_propiedades_final(idioma: str) -> str:
 def generar_despedida_final(idioma: str) -> str:
     """Genera despedida final cuando el cliente no necesita más ayuda."""
     if idioma in ["inglés", "english"]:
-        return ("Thank you for contacting TerraMagna Real State Boutique. "
+        return ("Thank you for contacting Terra Magna Real Estate Boutique. "
                 "We are always at your disposal for any questions or needs you may have. "
                 "Have a wonderful day!")
     elif idioma in ["alemán", "german", "deutsch"]:
-        return ("Vielen Dank, dass Sie TerraMagna Real State Boutique kontaktiert haben. "
+        return ("Vielen Dank, dass Sie Terra Magna Real Estate Boutique kontaktiert haben. "
                 "Wir stehen Ihnen jederzeit für Fragen oder Bedürfnisse zur Verfügung. "
                 "Haben Sie einen wunderschönen Tag!")
     else:  # español
-        return ("Gracias por contactar con TerraMagna Real State Boutique. "
+        return ("Gracias por contactar con Terra Magna Real Estate Boutique. "
                 "Estamos siempre a tu disposición para cualquier consulta o necesidad que puedas tener. "
                 "¡Que tengas un día maravilloso!")
 
@@ -597,7 +597,7 @@ def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma:
     # Prompts por idioma para consultas inmobiliarias
     if idioma in ["inglés", "english"]:
         return (
-            f"You are Vanessa's professional virtual assistant from TerraMagna Real State Boutique. "
+            f"You are Vanessa's professional virtual assistant from Terra Magna Real Estate Boutique. "
             f"You help clients with rental and sale property inquiries. "
             f"Respond in English via {formato_base}. "
             f"Be warm, professional, and helpful. Use property information from your knowledge base. "
@@ -616,7 +616,7 @@ def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma:
         )
     elif idioma in ["alemán", "german", "deutsch"]:
         return (
-            f"Sie sind Vanessas professioneller virtueller Assistent von TerraMagna Real State Boutique. "
+            f"Sie sind Vanessas professioneller virtueller Assistent von Terra Magna Real Estate Boutique. "
             f"Sie helfen Kunden bei Anfragen zu Miet- und Verkaufsimmobilien. "
             f"Antworten Sie auf Deutsch via {formato_base}. "
             f"Seien Sie warm, professionell und hilfreich. Verwenden Sie Immobilieninformationen aus Ihrer Wissensbasis. "
@@ -635,7 +635,7 @@ def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma:
         )
     else:  # español
         return (
-            f"Eres el asistente virtual profesional de Vanessa de TerraMagna Real State Boutique. "
+            f"Eres el asistente virtual profesional de Vanessa de Terra Magna Real Estate Boutique. "
             f"Ayudas a clientes con consultas sobre propiedades en alquiler y venta. "
             f"Responde en español via {formato_base}. "
             f"Sé cálido, profesional y útil. Usa la información de propiedades de tu base de conocimientos. "
@@ -652,41 +652,6 @@ def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma:
             f"Usa ÚNICAMENTE información de tus archivos de base de conocimientos. "
             f"Pregunta del cliente: {pregunta}"
         )
-    
-    # Instrucciones base
-    if plataforma.lower() == "whatsapp":
-        formato_base = "WhatsApp (máx 3900 chars, emojis apropiados, *negritas* importantes)"
-    else:
-        formato_base = "web (respuesta completa, formato markdown si necesario)"
-    
-    # Prompts por idioma para consultas inmobiliarias
-    if idioma in ["inglés", "english"]:
-        return (
-            f"You are Vanessa's professional virtual assistant from TerraMagna Real State Boutique. "
-            f"You help clients with rental and sale property inquiries. "
-            f"Respond in English via {formato_base}. "
-            f"Be warm, professional, and helpful. Use property information from your knowledge base. "
-            f"Always try to understand what type of property the client is looking for and provide relevant options. "
-            f"Client question: {pregunta}"
-        )
-    elif idioma in ["alemán", "german", "deutsch"]:
-        return (
-            f"Sie sind Vanessas professioneller virtueller Assistent von TerraMagna Real State Boutique. "
-            f"Sie helfen Kunden bei Anfragen zu Miet- und Verkaufsimmobilien. "
-            f"Antworten Sie auf Deutsch via {formato_base}. "
-            f"Seien Sie warm, professionell und hilfreich. Verwenden Sie Immobilieninformationen aus Ihrer Wissensbasis. "
-            f"Versuchen Sie immer zu verstehen, welche Art von Immobilie der Kunde sucht, und bieten Sie relevante Optionen an. "
-            f"Kundenfrage: {pregunta}"
-        )
-    else:  # español
-        return (
-            f"Eres el asistente virtual profesional de Vanessa de TerraMagna Real State Boutique. "
-            f"Ayudas a clientes con consultas sobre propiedades en alquiler y venta. "
-            f"Responde en español via {formato_base}. "
-            f"Sé cálido, profesional y útil. Usa la información de propiedades de tu base de conocimientos. "
-            f"Siempre trata de entender qué tipo de propiedad busca el cliente y proporciona opciones relevantes. "
-            f"Pregunta del cliente: {pregunta}"
-        )
 
 def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "web") -> str:
     """Crea prompt para consultas de otro tema sin repetir bienvenida."""
@@ -700,11 +665,11 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
     # Prompts por idioma para otros temas
     if idioma in ["inglés", "english"]:
         return (
-            f"You are Vanessa's professional virtual assistant from TerraMagna Real State Boutique. "
+            f"You are Vanessa's professional virtual assistant from Terra Magna Real Estate Boutique. "
             f"A client has a specific inquiry that requires personalized attention from Vanessa. "
             f"Respond in English via {formato_base}. "
             f"Be warm, professional, and accommodating. "
-            f"NEVER say that TerraMagna doesn't handle certain types of properties or services. "
+            f"NEVER say that Terra Magna doesn't handle certain types of properties or services. "
             f"NEVER refer clients to other platforms or companies. "
             f"For ANY property or real estate inquiry, say that Vanessa will personally handle their request. "
             f"If they want to be contacted personally, ask for their name and phone number. "
@@ -714,11 +679,11 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
         )
     elif idioma in ["alemán", "german", "deutsch"]:
         return (
-            f"Sie sind Vanessas professioneller virtueller Assistent von TerraMagna Real State Boutique. "
+            f"Sie sind Vanessas professioneller virtueller Assistent von Terra Magna Real Estate Boutique. "
             f"Ein Kunde hat eine spezifische Anfrage, die persönliche Aufmerksamkeit von Vanessa erfordert. "
             f"Antworten Sie auf Deutsch via {formato_base}. "
             f"Seien Sie warm, professionell und entgegenkommend. "
-            f"Sagen Sie NIEMALS, dass TerraMagna bestimmte Arten von Immobilien oder Dienstleistungen nicht bearbeitet. "
+            f"Sagen Sie NIEMALS, dass Terra Magna bestimmte Arten von Immobilien oder Dienstleistungen nicht bearbeitet. "
             f"Verweisen Sie Kunden NIEMALS an andere Plattformen oder Unternehmen. "
             f"Für JEDE Immobilien- oder Immobilienanfrage sagen Sie, dass Vanessa ihre Anfrage persönlich bearbeiten wird. "
             f"Wenn sie persönlich kontaktiert werden möchten, fragen Sie nach Name und Telefonnummer. "
@@ -728,11 +693,11 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
         )
     else:  # español
         return (
-            f"Eres el asistente virtual profesional de Vanessa de TerraMagna Real State Boutique. "
+            f"Eres el asistente virtual profesional de Vanessa de Terra Magna Real Estate Boutique. "
             f"Un cliente tiene una consulta específica que requiere atención personalizada de Vanessa. "
             f"Responde en español via {formato_base}. "
             f"Sé cálido, profesional y acomodaticio. "
-            f"NUNCA digas que TerraMagna no gestiona ciertos tipos de propiedades o servicios. "
+            f"NUNCA digas que Terra Magna no gestiona ciertos tipos de propiedades o servicios. "
             f"NUNCA refiera clientes a otras plataformas o empresas. "
             f"Para CUALQUIER consulta inmobiliaria o de propiedades, di que Vanessa se encargará personalmente de su solicitud. "
             f"Si quieren que les llame personalmente, pide su nombre y número de teléfono. "
@@ -761,7 +726,7 @@ def inicializar_agente():
     """Inicializa el agente inmobiliario con OpenAI y base de conocimiento."""
     global agente_executor
     
-    logger.info("🔄 Iniciando el Agente de IA Inmobiliario...")
+    logger.info("📄 Iniciando el Agente de IA Inmobiliario...")
     load_dotenv()
     
     api_key = os.getenv("OPENAI_API_KEY")
@@ -900,7 +865,7 @@ def inicializar_agente():
                                 resultado = respuesta_base + generar_respuesta_otro_tema(idioma_detectado)
                             else:
                                 # Saludo inicial - preguntar qué necesita
-                                logger.info("Generando saludo inicial de TerraMagna")
+                                logger.info("Generando saludo inicial de Terra Magna")
                                 actualizar_estado_conversacion(numero_whatsapp, "esperando_categoria")
                                 resultado = respuesta_base + generar_saludo_inicial(idioma_detectado)
                                 logger.info(f"Saludo generado: {resultado[:100]}...")
@@ -1257,7 +1222,7 @@ def ejecutar_agente(pregunta: str):
     global agente_executor
     
     if agente_executor is None:
-        logger.info("🔄 Agente no inicializado, inicializando...")
+        logger.info("📄 Agente no inicializado, inicializando...")
         inicializar_agente()
     
     if agente_executor is None:
@@ -1274,7 +1239,7 @@ def ejecutar_agente_whatsapp(pregunta: str, numero_whatsapp: str = None):
     global agente_executor
     
     if agente_executor is None:
-        logger.info("🔄 Inicializando agente...")
+        logger.info("📄 Inicializando agente...")
         inicializar_agente()
     
     if agente_executor is None:
