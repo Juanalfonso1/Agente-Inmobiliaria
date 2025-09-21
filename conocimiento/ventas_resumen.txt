@@ -1,0 +1,60 @@
+PROPIEDADES EN VENTA - TERRAMAGNA REAL STATE BOUTIQUE
+
+TOTAL PROPIEDADES EN VENTA: 7
+
+PROPIEDAD 1: Dúplex 3 habitaciones en El Galeón, Adeje
+- Precio: 475.000€
+- Ubicación: El Galeón, Adeje, vistas parciales al mar
+- Habitaciones: 3
+- Referencia: VTA001
+- URL detalle: https://www.terramagna.net/inmueble/fantastico-duplex-en-venta-galeon-de-adeje/23138970
+
+PROPIEDAD 2: Apartamento 3 habitaciones en Caldera, Costa Adeje
+- Precio: 1.050.000€
+- Ubicación: Zona superior Caldera, cerca Siam Park, vistas océano
+- Habitaciones: 3
+- Referencia: VTA002
+- URL detalle: https://www.terramagna.net/inmueble/excepcional-oportunidad-de-inversion-en-la-prestigiosa-zona-de-caldera-apartamento-de-3-dormitorios/22975693
+
+PROPIEDAD 3: Apartamento 1 habitación en Palm Mar, El Mocán
+- Precio: 258.000€
+- Ubicación: Palm Mar, complejo El Mocán, garaje incluido
+- Habitaciones: 1
+- Referencia: VTA003
+- URL detalle: https://www.terramagna.net/inmueble/fantastica-oportunidad-de-inversion-en-palm-mar-apartamento-de-1-dormitorio/23401531
+
+PROPIEDAD 4: Villa 4 habitaciones en Campo de Golf Costa Adeje
+- Precio: 3.950.000€
+- Ubicación: Campo de Golf Costa Adeje, nueva construcción
+- Habitaciones: 4
+- Referencia: VTA004
+- URL detalle: https://www.terramagna.net/inmueble/en-venta-una-fantastica-villa-de-nueva-construccion-en-el-campo-de-golf-de-costa-adeje/21241717
+
+PROPIEDAD 5: Adosado 3 habitaciones en Fañabé
+- Precio: 940.500€
+- Ubicación: Fañabé, adosado esquina, vistas mar, jacuzzi
+- Habitaciones: 3
+- Referencia: VTA005
+- URL detalle: https://www.terramagna.net/inmueble/en-venta-espectacular-adosado-de-esquina-con-3-habitaciones-y-3-banos-con-vistas-panoramicas-al-mar-/20119336
+
+PROPIEDAD 6: Hotel Rural 11 habitaciones en Norte de Tenerife
+- Precio: 2.190.000€
+- Ubicación: Norte Tenerife, finca 22.000m², negocio funcionando
+- Habitaciones: 11
+- Referencia: VTA006
+- URL detalle: https://www.terramagna.net/inmueble/en-venta-pequeno-hotel-finca-bb-rural-en-el-norte-de-tenerife/20741830
+
+PROPIEDAD 7: Villa 4 habitaciones en Palm Mar (nueva construcción)
+- Precio: 1.750.000€
+- Ubicación: Palm Mar, nueva construcción, piscina privada
+- Habitaciones: 4
+- Referencia: VTA007
+- URL detalle: https://www.terramagna.net/inmueble/villa-de-nueva-construccion-en-palm-mar/21561023
+
+INSTRUCCIONES PARA EL ASISTENTE:
+- Cuando pregunten por ventas, mostrar este resumen completo
+- Preguntar si quieren información detallada de alguna propiedad específica
+- Si piden detalles, proporcionar la URL correspondiente y mencionar que pueden contactar con Vanessa
+- Usar las referencias (VTA001, VTA002, etc.) para identificar propiedades claramente
+- Mantener formato profesional y amigable
+- Destacar características únicas de cada propiedad según el interés del cliente
