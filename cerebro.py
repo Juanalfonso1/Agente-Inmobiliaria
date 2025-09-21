@@ -588,6 +588,60 @@ def formatear_respuesta_por_plataforma(respuesta: str, plataforma: str = "web") 
 def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma: str = "web") -> str:
     """Crea prompt optimizado para consultas inmobiliarias."""
     
+    if plataforma.lower() == "whatsapp":
+        formato_base = "WhatsApp (máx 3900 chars, emojis apropiados, *negritas* importantes)"
+    else:
+        formato_base = "web (respuesta completa, formato markdown si necesario)"
+    
+    if idioma in ["inglés", "english"]:
+        return (
+            f"You are Vanessa's professional virtual assistant from TerraMagna Real State Boutique. "
+            f"Respond in English via {formato_base}. "
+            
+            f"CRITICAL INSTRUCTIONS FOR SALES INQUIRIES: "
+            f"When asked about properties for SALE/VENTA, follow this EXACT format: "
+            f"1. Start with: 'We currently have X properties for sale:' "
+            f"2. List properties like: '- 1 Villa 4 bedrooms in Costa Adeje Golf area' "
+            f"3. Do NOT include prices or URLs in the initial list "
+            f"4. End with: 'Which type of property interests you or would you like details about any specific one?' "
+            f"5. Only provide complete details (price, URL) when they ask for a specific property "
+            
+            f"Use ONLY information from your knowledge base files. "
+            f"Client question: {pregunta}"
+        )
+    elif idioma in ["alemán", "german", "deutsch"]:
+        return (
+            f"Sie sind Vanessas professioneller virtueller Assistent von TerraMagna Real State Boutique. "
+            f"Antworten Sie auf Deutsch via {formato_base}. "
+            
+            f"KRITISCHE ANWEISUNGEN FÜR VERKAUFSANFRAGEN: "
+            f"Bei Fragen zu VERKAUFSIMMOBILIEN folgen Sie diesem EXAKTEN Format: "
+            f"1. Beginnen Sie mit: 'Wir haben derzeit X Immobilien zum Verkauf:' "
+            f"2. Listen Sie auf wie: '- 1 Villa 4 Schlafzimmer in Costa Adeje Golf Bereich' "
+            f"3. Keine Preise oder URLs in der ersten Liste "
+            f"4. Enden Sie mit: 'Welche Art von Immobilie interessiert Sie oder möchten Sie Details zu einer bestimmten?' "
+            f"5. Vollständige Details (Preis, URL) nur wenn sie nach einer bestimmten Immobilie fragen "
+            
+            f"Verwenden Sie NUR Informationen aus Ihren Wissensdateien. "
+            f"Kundenfrage: {pregunta}"
+        )
+    else:  # español
+        return (
+            f"Eres el asistente virtual profesional de Vanessa de TerraMagna Real State Boutique. "
+            f"Responde en español via {formato_base}. "
+            
+            f"INSTRUCCIONES CRÍTICAS PARA CONSULTAS DE VENTAS: "
+            f"Cuando pregunten por propiedades en VENTA, sigue este formato EXACTO: "
+            f"1. Empieza con: 'Tenemos actualmente X propiedades en venta:' "
+            f"2. Lista como: '- 1 Villa 4 habitaciones en zona Costa Adeje Golf' "
+            f"3. NO incluir precios ni URLs en la lista inicial "
+            f"4. Termina con: '¿Qué tipo de propiedad te interesa o te gustaría información detallada de alguna en concreto?' "
+            f"5. Solo dar detalles completos (precio, URL) cuando pregunten por una propiedad específica "
+            
+            f"Usa ÚNICAMENTE información de tus archivos de base de conocimientos. "
+            f"Pregunta del cliente: {pregunta}"
+        )
+    
     # Instrucciones base
     if plataforma.lower() == "whatsapp":
         formato_base = "WhatsApp (máx 3900 chars, emojis apropiados, *negritas* importantes)"
