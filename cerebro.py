@@ -253,6 +253,44 @@ def formatear_respuesta_por_plataforma(respuesta: str, plataforma: str = "web") 
         # Web: respuesta completa sin limitaciones
         return respuesta
 
+def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma: str = "web") -> str:
+    """Crea prompt optimizado para consultas inmobiliarias."""
+    
+    # Instrucciones base
+    if plataforma.lower() == "whatsapp":
+        formato_base = "WhatsApp (máx 3900 chars, emojis apropiados, *negritas* importantes)"
+    else:
+        formato_base = "web (respuesta completa, formato markdown si necesario)"
+    
+    # Prompts por idioma para consultas inmobiliarias
+    if idioma in ["inglés", "english"]:
+        return (
+            f"You are Vanessa's professional virtual assistant from TerraMagna Real State Boutique. "
+            f"You help clients with rental and sale property inquiries. "
+            f"Respond in English via {formato_base}. "
+            f"Be warm, professional, and helpful. Use property information from your knowledge base. "
+            f"Always try to understand what type of property the client is looking for and provide relevant options. "
+            f"Client question: {pregunta}"
+        )
+    elif idioma in ["alemán", "german", "deutsch"]:
+        return (
+            f"Sie sind Vanessas professioneller virtueller Assistent von TerraMagna Real State Boutique. "
+            f"Sie helfen Kunden bei Anfragen zu Miet- und Verkaufsimmobilien. "
+            f"Antworten Sie auf Deutsch via {formato_base}. "
+            f"Seien Sie warm, professionell und hilfreich. Verwenden Sie Immobilieninformationen aus Ihrer Wissensbasis. "
+            f"Versuchen Sie immer zu verstehen, welche Art von Immobilie der Kunde sucht, und bieten Sie relevante Optionen an. "
+            f"Kundenfrage: {pregunta}"
+        )
+    else:  # español
+        return (
+            f"Eres el asistente virtual profesional de Vanessa de TerraMagna Real State Boutique. "
+            f"Ayudas a clientes con consultas sobre propiedades en alquiler y venta. "
+            f"Responde en español via {formato_base}. "
+            f"Sé cálido, profesional y útil. Usa la información de propiedades de tu base de conocimientos. "
+            f"Siempre trata de entender qué tipo de propiedad busca el cliente y proporciona opciones relevantes. "
+            f"Pregunta del cliente: {pregunta}"
+        )
+
 def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "web") -> str:
     """Crea prompt para consultas de otro tema sin repetir bienvenida."""
     
