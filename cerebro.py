@@ -285,6 +285,15 @@ def generar_pregunta_necesita_algo_mas(idioma: str) -> str:
     else:  # español
         return "¿Hay algo más en lo que pueda ayudarte hoy?"
 
+def generar_oferta_propiedades_final(idioma: str) -> str:
+    """Ofrece propiedades antes de la despedida final."""
+    if idioma in ["inglés", "english"]:
+        return "Before we say goodbye, would you like to know about our rental and sale properties?"
+    elif idioma in ["alemán", "german", "deutsch"]:
+        return "Bevor wir uns verabschieden, möchten Sie mehr über unsere Miet- und Verkaufsimmobilien erfahren?"
+    else:  # español
+        return "Antes de despedirnos, ¿te gustaría conocer nuestras propiedades en alquiler o venta?"
+
 def generar_despedida_final(idioma: str) -> str:
     """Genera despedida final cuando el cliente no necesita más ayuda."""
     if idioma in ["inglés", "english"]:
@@ -421,6 +430,8 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
             f"Respond in English via {formato_base}. "
             f"Be warm, professional, and offer appropriate assistance. "
             f"If they want to be contacted personally, ask for their name and phone number. "
+            f"DO NOT repeat greetings or say 'Hello' again. Start directly with the helpful response. "
+            f"DO NOT ask about properties at the end - focus only on their specific inquiry. "
             f"Client inquiry: {pregunta}"
         )
     elif idioma in ["alemán", "german", "deutsch"]:
@@ -430,6 +441,8 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
             f"Antworten Sie auf Deutsch via {formato_base}. "
             f"Seien Sie warm, professionell und bieten Sie angemessene Hilfe an. "
             f"Wenn sie persönlich kontaktiert werden möchten, fragen Sie nach Name und Telefonnummer. "
+            f"Wiederholen Sie KEINE Begrüßungen und sagen Sie nicht noch einmal 'Hallo'. Beginnen Sie direkt mit der hilfreichen Antwort. "
+            f"Fragen Sie am Ende NICHT nach Immobilien - konzentrieren Sie sich nur auf ihre spezifische Anfrage. "
             f"Kundenanfrage: {pregunta}"
         )
     else:  # español
@@ -439,6 +452,8 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
             f"Responde en español via {formato_base}. "
             f"Sé cálido, profesional y ofrece la asistencia apropiada. "
             f"Si quieren que les llame personalmente, pide su nombre y número de teléfono. "
+            f"NO repitas saludos ni digas 'Hola' de nuevo. Comienza directamente con la respuesta útil. "
+            f"NO preguntes sobre propiedades al final - enfócate solo en su consulta específica. "
             f"Consulta del cliente: {pregunta}"
         )
     """Crea prompt optimizado para consultas inmobiliarias."""
@@ -706,9 +721,9 @@ def inicializar_agente():
                         # Nuevo estado: preguntando si necesita algo más
                         elif estado_conversacion["estado"] == "preguntando_algo_mas":
                             if detectar_respuesta_negativa(pregunta_procesada):
-                                # Cliente dice que no necesita más ayuda
-                                resultado = generar_despedida_final(idioma_detectado)
-                                actualizar_estado_conversacion(numero_whatsapp, "finalizado")
+                                # Cliente dice que no necesita más ayuda - ofrecer propiedades antes de despedir
+                                resultado = generar_oferta_propiedades_final(idioma_detectado)
+                                actualizar_estado_conversacion(numero_whatsapp, "ofreciendo_propiedades_final")
                             else:
                                 # Cliente dice que sí o hace otra consulta
                                 nueva_categoria = detectar_respuesta_categoria(pregunta_procesada)
@@ -735,6 +750,21 @@ def inicializar_agente():
                                         resultado = "Womit genau möchten Sie Hilfe?"
                                     else:
                                         resultado = "¿Con qué específicamente te gustaría que te ayude?"
+                        
+                        # Nuevo estado: ofreciendo propiedades antes de despedir
+                        elif estado_conversacion["estado"] == "ofreciendo_propiedades_final":
+                            if detectar_respuesta_categoria(pregunta_procesada) == "inmobiliario":
+                                # Cliente acepta conocer propiedades
+                                actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
+                                consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+                                respuesta = qa.invoke({"query": consulta})
+                                resultado_base = respuesta.get("result", str(respuesta))
+                                resultado = resultado_base + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
+                                actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
+                            else:
+                                # Cliente no quiere propiedades, despedir definitivamente
+                                resultado = generar_despedida_final(idioma_detectado)
+                                actualizar_estado_conversacion(numero_whatsapp, "finalizado")
                         
                         # Si está en otro tema pero puede cambiar de opinión
                         elif estado_conversacion["estado"] == "otro_tema_finalizado":
