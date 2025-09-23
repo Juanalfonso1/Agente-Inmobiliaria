@@ -1,11 +1,11 @@
-# cerebro.py - VERSIÓN FINAL CON DETECCIÓN DE IDIOMA Y RESUMEN
-
 import os
 import re
 import logging
 import json
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from dotenv import load_dotenv
+import csv
+import io
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)
@@ -17,11 +17,11 @@ agente_executor = None
 # Sistema de conversación con estados MEJORADO
 estados_conversacion = {}
 
-# NUEVO: Sistema de almacenamiento de consultas para Vanessa
+# Sistema de almacenamiento de consultas para Vanessa
 consultas_vanessa = {}
 
-# NUEVO: Configuración del número de la inmobiliaria
-NUMERO_INMOBILIARIA = os.getenv("NUMERO_INMOBILIARIA", "")  # Configurar en .env
+# Configuración del número de la inmobiliaria
+NUMERO_INMOBILIARIA = os.getenv("NUMERO_INMOBILIARIA", "")
 
 def limpiar_texto_whatsapp(texto: str) -> str:
     """Limpia y normaliza texto de WhatsApp."""
@@ -35,10 +35,10 @@ def limpiar_texto_whatsapp(texto: str) -> str:
     
     return texto_limpio[:500]  # Limitar longitud
 
-def detectar_idioma_mejorado(texto: str, llm, numero_whatsapp: str = None) -> str:
+def detectar_idioma_mejorado(texto: str, llm=None, numero_whatsapp: str = None) -> str:
     """Detecta el idioma del texto usando el modelo LLM con memoria de conversación."""
     try:
-        # NUEVO: Verificar si hay un idioma previamente detectado en la conversación
+        # Verificar si hay un idioma previamente detectado en la conversación
         if numero_whatsapp and numero_whatsapp in estados_conversacion:
             idioma_previo = estados_conversacion[numero_whatsapp].get("idioma_detectado")
             
@@ -92,7 +92,7 @@ def tiene_cambio_de_idioma(texto: str, idioma_actual: str) -> bool:
     # Verificar si es diferente al actual
     return nuevo_idioma != idioma_actual
 
-def detectar_idioma_actual(texto: str, llm) -> str:
+def detectar_idioma_actual(texto: str, llm=None) -> str:
     """Detecta el idioma actual del texto."""
     try:
         texto_lower = texto.lower()
@@ -114,8 +114,8 @@ def detectar_idioma_actual(texto: str, llm) -> str:
         elif score_de > 0:
             return "alemán"
         
-        # Si no es claro, usar LLM
-        if len(texto) > 50:
+        # Si no es claro y hay LLM disponible, usar LLM
+        if llm and len(texto) > 50:
             consulta = (
                 "Detecta en qué idioma está escrito el siguiente texto y "
                 "responde con una sola palabra: "
@@ -126,7 +126,7 @@ def detectar_idioma_actual(texto: str, llm) -> str:
             idioma = response.content.strip().lower().replace('.', '')
             
             if idioma in ['español', 'inglés', 'alemán', 'spanish', 'english', 'german']:
-                return idioma
+                return idioma if idioma in ['español', 'inglés', 'alemán'] else 'español'
         
         return "español"  # Por defecto
         
@@ -134,7 +134,6 @@ def detectar_idioma_actual(texto: str, llm) -> str:
         logger.warning(f"Error detectando idioma actual: {e}")
         return "español"
 
-# NUEVO: Función para detectar comando de resumen
 def es_comando_resumen(texto: str, numero_whatsapp: str) -> bool:
     """Detecta si el mensaje es el comando 'resumen' desde el número de la inmobiliaria."""
     if not NUMERO_INMOBILIARIA:
@@ -150,7 +149,6 @@ def es_comando_resumen(texto: str, numero_whatsapp: str) -> bool:
     # Verificar si el mensaje es exactamente "resumen"
     return texto.strip().lower() == "resumen"
 
-# NUEVO: Función para generar resumen de consultas
 def generar_resumen_consultas() -> str:
     """Genera un resumen de todas las consultas pendientes para Vanessa."""
     if not consultas_vanessa:
@@ -164,13 +162,12 @@ def generar_resumen_consultas() -> str:
         resumen += f"👤 Nombre: {datos.get('nombre', 'No proporcionado')}\n"
         resumen += f"📅 Fecha: {datos.get('fecha', 'N/A')}\n"
         resumen += f"💬 Consulta: {datos.get('mensaje', 'N/A')}\n"
-        resumen += f"🌐 Idioma: {datos.get('idioma', 'No detectado')}\n"
+        resumen += f"🌍 Idioma: {datos.get('idioma', 'No detectado')}\n"
         resumen += "─" * 30 + "\n\n"
     
     resumen += f"📊 *Total de consultas: {len(consultas_vanessa)}*"
     return resumen
 
-# NUEVO: Función para guardar consulta para Vanessa
 def guardar_consulta_vanessa(numero_whatsapp: str, mensaje: str, idioma: str, nombre: str = None):
     """Guarda una consulta que debe ser atendida por Vanessa."""
     consultas_vanessa[numero_whatsapp] = {
@@ -241,17 +238,28 @@ def detectar_respuesta_categoria(texto: str) -> str:
     """Detecta si la respuesta es sobre alquileres/ventas u otro tema."""
     texto_lower = texto.lower().strip()
     
-    # Palabras que indican consulta específica sobre propiedades DISPONIBLES
-    palabras_inmobiliario_especifico = [
-        'tiene propiedades', 'tienen propiedades', 'qué propiedades tienen', 'propiedades disponibles',
-        'casas disponibles', 'pisos disponibles', 'apartamentos disponibles',
-        'propiedades en alquiler', 'propiedades en venta', 'casas en alquiler', 'casas en venta',
-        'pisos en alquiler', 'pisos en venta', 'apartamentos en alquiler', 'apartamentos en venta',
-        'mostrar propiedades', 'ver propiedades', 'busco casa', 'busco piso', 'busco apartamento',
-        'necesito casa', 'necesito piso', 'necesito apartamento'
+    # Palabras que indican interés en VENTAS específicamente
+    palabras_venta_especificas = [
+        'venta', 'ventas', 'en venta', 'para venta', 'comprar', 'compra',
+        'perfecto en venta', 'quiero en venta', 'interesa venta',
+        'sale', 'for sale', 'buy', 'purchase'
     ]
     
-    # Palabras que indican ASESORAMIENTO o consulta personal (otro tema)
+    # Palabras que indican interés en ALQUILERES específicamente  
+    palabras_alquiler_especificas = [
+        'alquiler', 'alquilar', 'en alquiler', 'para alquiler', 'rentar',
+        'perfecto en alquiler', 'quiero alquilar', 'interesa alquiler',
+        'rent', 'rental', 'for rent'
+    ]
+    
+    # Solicitudes de contacto con Vanessa
+    solicitudes_contacto_vanessa = [
+        'hablar con vanessa', 'contactar vanessa', 'vanessa', 'puedo hablar con vanessa',
+        'quiero hablar con vanessa', 'me puede llamar vanessa', 'llamar vanessa',
+        'speak with vanessa', 'contact vanessa', 'call vanessa'
+    ]
+    
+    # Palabras que indican ASESORAMIENTO o consulta personal
     palabras_asesoria_personal = [
         'aconsejar', 'aconseje', 'asesoramiento', 'asesorar', 'ayuda para invertir',
         'consejos', 'consulta para invertir', 'quiero invertir', 'cómo invertir',
@@ -259,54 +267,29 @@ def detectar_respuesta_categoria(texto: str) -> str:
         'mejor zona para', 'dónde es mejor', 'advice', 'consult', 'recommend'
     ]
     
-    # Palabras que indican otro tema claramente (incluye solicitudes de llamada)
-    palabras_otro_tema = [
-        'otro tema', 'otra cosa', 'diferente', 'consulta legal', 'información legal', 
-        'servicio legal', 'no', 'nada', 'otro asunto', 'legal', 'jurídico',
-        'llamar', 'llame', 'teléfono', 'telefono', 'call', 'phone', 'contacto',
-        'hablar con vanessa', 'contactar vanessa', 'hablar', 'conversar'
-    ]
-    
-    # Frases que indican seguimiento o más preguntas
-    palabras_seguimiento = [
-        'algo más', 'otra pregunta', 'más información', 'seguir', 'continuar',
-        'gracias', 'perfecto', 'ok', 'vale', 'bien'
-    ]
-    
-    # PRIORIDAD: Detectar primero si es asesoramiento personal
-    if any(palabra in texto_lower for palabra in palabras_asesoria_personal):
+    # PRIORIDAD 1: Detectar solicitudes de contacto con Vanessa
+    if any(solicitud in texto_lower for solicitud in solicitudes_contacto_vanessa):
         return "otro_tema"
     
-    # Detectar si pregunta específicamente por propiedades disponibles
-    elif any(frase in texto_lower for frase in palabras_inmobiliario_especifico):
+    # PRIORIDAD 2: Detectar interés específico en ventas o alquileres
+    elif any(palabra in texto_lower for palabra in palabras_venta_especificas + palabras_alquiler_especificas):
         return "inmobiliario"
     
-    # Detectar otros temas
-    elif any(tema in texto_lower for tema in palabras_otro_tema):
+    # PRIORIDAD 3: Detectar asesoramiento personal
+    elif any(palabra in texto_lower for palabra in palabras_asesoria_personal):
         return "otro_tema"
     
-    # Detectar seguimiento
-    elif any(palabra in texto_lower for palabra in palabras_seguimiento):
-        return "seguimiento"
+    # Si menciona propiedades en general
+    palabras_inmobiliario_general = [
+        'casa', 'piso', 'apartamento', 'propiedad', 'inmueble', 'vivienda', 
+        'house', 'apartment', 'property'
+    ]
     
-    # Si menciona propiedades pero en contexto de asesoramiento
-    elif 'invertir' in texto_lower or 'inversión' in texto_lower:
-        return "otro_tema"
-    
+    if any(palabra in texto_lower for palabra in palabras_inmobiliario_general):
+        return "inmobiliario"
     else:
-        # Si es una pregunta específica y directa sobre propiedades
-        palabras_inmobiliario_general = [
-            'alquiler', 'alquilar', 'venta', 'vender', 'comprar', 'casa', 'piso', 
-            'apartamento', 'propiedad', 'inmueble', 'vivienda', 'rent', 'rental',
-            'sale', 'buy', 'house', 'apartment', 'property', 'alquileres', 'ventas'
-        ]
-        
-        if any(palabra in texto_lower for palabra in palabras_inmobiliario_general):
-            return "inmobiliario"
-        else:
-            return "otro_tema"
+        return "seguimiento"
 
-# NUEVO: Función para detectar consultas específicas de propiedades
 def detectar_consulta_propiedad_especifica(texto: str) -> bool:
     """Detecta si el cliente pregunta por una propiedad específica."""
     texto_lower = texto.lower()
@@ -329,7 +312,7 @@ def obtener_estado_conversacion(numero_whatsapp: str) -> dict:
             "contador_mensajes": 0,
             "idioma_detectado": None,
             "bandera_mostrada": False,
-            "cambio_idioma": False  # NUEVO: para trackear cambios de idioma
+            "cambio_idioma": False
         }
     
     return estados_conversacion[numero_whatsapp]
@@ -346,7 +329,7 @@ def actualizar_estado_conversacion(numero_whatsapp: str, nuevo_estado: str):
     })
 
 def generar_saludo_inicial(idioma: str) -> str:
-    """Genera el saludo inicial según el idioma - MENSAJE EXACTO REQUERIDO."""
+    """Genera el saludo inicial según el idioma."""
     if idioma in ["inglés", "english"]:
         return ("🏠 Hello! I'm Vanessa's virtual assistant from TerraMagna Real State Boutique. "
                 "Are you looking to inquire about rental or sale properties? Or is it about another topic?")
@@ -369,7 +352,6 @@ def generar_respuesta_otro_tema(idioma: str) -> str:
         return ("Gracias por tu consulta. Por favor, expónnos qué necesitas y "
                 "Vanessa se pondrá en contacto contigo en breve para ayudarte personalmente.")
 
-# NUEVO: Función para generar mensaje de cambio de idioma
 def generar_mensaje_cambio_idioma(idioma_nuevo: str) -> str:
     """Genera un mensaje confirmando el cambio de idioma."""
     if idioma_nuevo in ["inglés", "english"]:
@@ -392,13 +374,13 @@ def detectar_datos_contacto(texto: str) -> bool:
     tiene_telefono = any(palabra in texto_lower for palabra in [
         'mi teléfono', 'mi telefono', 'mi número', 'mi numero', 'my phone', 'my number',
         'mein telefon', 'meine nummer', 'tfno', 'telefono', 'teléfono', 'numero', 'número'
-    ]) or bool(re.search(r'\d{3}.*\d{3}.*\d{3}', texto))  # Detecta patrones de teléfono
+    ]) or bool(re.search(r'\d{3}.*\d{3}.*\d{3}', texto))
     
     # Si tiene ambos o al menos uno muy claro
     if tiene_nombre and tiene_telefono:
         return True
     
-    # Detectar si hay números de teléfono largos en el texto (6+ dígitos consecutivos)
+    # Detectar si hay números de teléfono largos en el texto
     if re.search(r'\d{6,}', texto):
         return True
     
@@ -406,17 +388,8 @@ def detectar_datos_contacto(texto: str) -> bool:
     if re.search(r'6\d{8}|9\d{8}|[+]34\s*6\d{8}|[+]34\s*9\d{8}', texto):
         return True
     
-    # Detectar patrón: "nombre + número" en el mismo mensaje
-    palabras = texto.split()
-    tiene_numero_largo = any(re.search(r'\d{6,}', palabra) for palabra in palabras)
-    tiene_palabra_nombre = any(palabra in ['es', 'soy', 'me', 'llamo', 'nombre'] for palabra in palabras[:3])
-    
-    if tiene_numero_largo and (tiene_palabra_nombre or len(palabras) <= 6):
-        return True
-    
     return False
 
-# NUEVO: Función para extraer nombre del texto
 def extraer_nombre_del_texto(texto: str) -> str:
     """Extrae el nombre del cliente del texto."""
     texto_lower = texto.lower()
@@ -458,7 +431,7 @@ def generar_confirmacion_llamada(idioma: str) -> str:
                 "Por favor, proporciona tu nombre y número de teléfono para que pueda contactarte lo antes posible.")
 
 def detectar_insistencia_contacto_personal(texto: str) -> bool:
-    """Detecta si el cliente insiste en hablar con Vanessa después de haber recibido respuesta de otro tema."""
+    """Detecta si el cliente insiste en hablar con Vanessa."""
     texto_lower = texto.lower().strip()
     
     frases_insistencia = [
@@ -470,7 +443,10 @@ def detectar_insistencia_contacto_personal(texto: str) -> bool:
         'solo quiero que me llame',
         'necesito que me llame',
         'cuando me va a llamar',
-        'cuándo me llama'
+        'cuándo me llama',
+        'puedo hablar con vanessa',
+        'hablar con vanessa',
+        'contactar vanessa'
     ]
     
     return any(frase in texto_lower for frase in frases_insistencia)
@@ -484,23 +460,17 @@ def generar_pregunta_seguimiento(idioma: str) -> str:
     else:  # español
         return "¿Hay algo más en lo que pueda ayudarte? ¿Te gustaría conocer nuestras propiedades en alquiler o venta?"
 
-def generar_pregunta_necesita_algo_mas(idioma: str) -> str:
-    """Pregunta si necesita algo más después de que explique sus necesidades."""
+def generar_confirmacion_consulta_anotada(idioma: str) -> str:
+    """Confirma que se anotó la consulta para Vanessa y pide datos de contacto."""
     if idioma in ["inglés", "english"]:
-        return "Is there anything else I can help you with today?"
+        return ("Thank you for the details. I have noted everything for Vanessa. "
+                "For her to contact you personally, please provide your name and phone number.")
     elif idioma in ["alemán", "german", "deutsch"]:
-        return "Gibt es noch etwas anderes, womit ich Ihnen heute helfen kann?"
+        return ("Vielen Dank für die Details. Ich habe alles für Vanessa notiert. "
+                "Damit sie Sie persönlich kontaktieren kann, geben Sie bitte Ihren Namen und Ihre Telefonnummer an.")
     else:  # español
-        return "¿Hay algo más en lo que pueda ayudarte hoy?"
-
-def generar_oferta_propiedades_final(idioma: str) -> str:
-    """Ofrece propiedades antes de la despedida final."""
-    if idioma in ["inglés", "english"]:
-        return "Before we say goodbye, would you like to know about our rental and sale properties?"
-    elif idioma in ["alemán", "german", "deutsch"]:
-        return "Bevor wir uns verabschieden, möchten Sie mehr über unsere Miet- und Verkaufsimmobilien erfahren?"
-    else:  # español
-        return "Antes de despedirnos, ¿te gustaría conocer nuestras propiedades en alquiler o venta?"
+        return ("Gracias por los detalles. He anotado todo para Vanessa. "
+                "Para que pueda contactarte personalmente, por favor proporciona tu nombre y número de teléfono.")
 
 def generar_despedida_final(idioma: str) -> str:
     """Genera despedida final cuando el cliente no necesita más ayuda."""
@@ -534,17 +504,27 @@ def detectar_finalizacion_conversacion(texto: str) -> bool:
     """Detecta si el cliente quiere finalizar la conversación."""
     texto_lower = texto.lower().strip()
     
-    palabras_finalizacion = [
-        'gracias', 'thank you', 'thanks', 'danke', 'perfecto', 'perfect',
-        'ok', 'vale', 'bien', 'good', 'gut', 'nada más', 'nothing else',
-        'nichts mehr', 'eso es todo', "that's all", 'das ist alles'
+    # Solo palabras que realmente indican finalización
+    palabras_finalizacion_real = [
+        'gracias y nada más', 'thank you and nothing else', 'danke und nichts mehr',
+        'eso es todo gracias', "that's all thanks", 'das ist alles danke',
+        'no necesito nada más gracias', 'no necesito más gracias',
+        'estoy bien gracias', 'i\'m good thanks', 'i\'m fine thanks'
     ]
     
-    # Si es una respuesta muy corta con palabras de agradecimiento
-    if len(texto.split()) <= 3 and any(palabra in texto_lower for palabra in palabras_finalizacion):
-        return True
+    # Excluir respuestas que indican interés en propiedades
+    palabras_que_indican_interes = [
+        'venta', 'ventas', 'alquiler', 'alquilar', 'comprar', 'casa', 'piso',
+        'apartamento', 'propiedad', 'vanessa', 'hablar', 'contacto',
+        'perfecto en', 'quiero en', 'interesa', 'sale', 'rent', 'buy'
+    ]
     
-    return False
+    # Si contiene palabras de interés, NO es finalización
+    if any(palabra in texto_lower for palabra in palabras_que_indican_interes):
+        return False
+    
+    # Solo es finalización si usa frases específicas de cierre
+    return any(frase in texto_lower for frase in palabras_finalizacion_real)
 
 def aplicar_bandera_si_necesario(respuesta: str, idioma: str, numero_whatsapp: str) -> str:
     """Aplica bandera solo si es el primer mensaje de la conversación."""
@@ -667,7 +647,6 @@ def crear_prompt_inmobiliario_optimizado(pregunta: str, idioma: str, plataforma:
             f"Pregunta del cliente: {pregunta}"
         )
 
-# NUEVO: Función para crear prompt de consulta detallada
 def crear_prompt_consulta_detallada(pregunta: str, idioma: str, plataforma: str = "web") -> str:
     """Crea prompt para cuando el cliente pregunta por una propiedad específica."""
     
@@ -759,18 +738,6 @@ def crear_prompt_para_otro_tema(pregunta: str, idioma: str, plataforma: str = "w
             f"NO preguntes sobre propiedades al final - enfócate solo en su consulta específica. "
             f"Consulta del cliente: {pregunta}"
         )
-
-def generar_confirmacion_consulta_anotada(idioma: str) -> str:
-    """Confirma que se anotó la consulta para Vanessa y pide datos de contacto."""
-    if idioma in ["inglés", "english"]:
-        return ("Thank you for the details. I have noted everything for Vanessa. "
-                "For her to contact you personally, please provide your name and phone number.")
-    elif idioma in ["alemán", "german", "deutsch"]:
-        return ("Vielen Dank für die Details. Ich habe alles für Vanessa notiert. "
-                "Damit sie Sie persönlich kontaktieren kann, geben Sie bitte Ihren Namen und Ihre Telefonnummer an.")
-    else:  # español
-        return ("Gracias por los detalles. He anotado todo para Vanessa. "
-                "Para que pueda contactarte personalmente, por favor proporciona tu nombre y número de teléfono.")
 
 def esta_en_horario_comercial() -> bool:
     """Verificación de horario comercial - SIEMPRE ACTIVO 24/7."""
@@ -875,7 +842,7 @@ def inicializar_agente():
                     if not pregunta_procesada.strip():
                         return "No pude entender tu mensaje. ¿Podrías reformularlo?"
                     
-                    # NUEVO: Verificar si es comando de resumen
+                    # Verificar si es comando de resumen
                     if plataforma.lower() == "whatsapp" and numero_whatsapp and es_comando_resumen(pregunta_procesada, numero_whatsapp):
                         logger.info("📋 Comando RESUMEN detectado desde número de inmobiliaria")
                         return generar_resumen_consultas()
@@ -888,252 +855,22 @@ def inicializar_agente():
                         estado_conversacion = obtener_estado_conversacion(numero_whatsapp)
                         logger.info(f"Estado actual para {numero_whatsapp[-4:]}****: {estado_conversacion['estado']}")
                         
-                        # NUEVO: Verificar si hubo cambio de idioma
+                        # Verificar si hubo cambio de idioma
                         if estado_conversacion.get("cambio_idioma", False):
                             logger.info(f"🔄 Cambio de idioma detectado a: {idioma_detectado}")
-                            # Resetear la bandera de cambio
                             estados_conversacion[numero_whatsapp]["cambio_idioma"] = False
-                            # Mostrar mensaje de cambio de idioma
                             mensaje_cambio = generar_mensaje_cambio_idioma(idioma_detectado)
-                            # Continuar con la respuesta normal pero incluir el mensaje de cambio
                             respuesta_base = mensaje_cambio + "\n\n"
                         else:
                             respuesta_base = ""
                         
-                        # Si es el primer mensaje o estado inicial
-                        if estado_conversacion["estado"] == "inicial":
-                            intencion = detectar_intencion_inicial(pregunta_procesada)
-                            logger.info(f"Intención detectada: {intencion}")
-                            
-                            if intencion == "inmobiliario_directo":
-                                # Cliente menciona directamente inmuebles
-                                actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
-                                # NUEVO: Aplicar lógica diferenciada desde el inicio
-                                if detectar_consulta_propiedad_especifica(pregunta_procesada):
-                                    consulta = crear_prompt_consulta_detallada(pregunta_procesada, idioma_detectado, plataforma)
-                                    respuesta = qa.invoke({"query": consulta})
-                                    resultado = respuesta_base + respuesta.get("result", str(respuesta))
-                                elif "venta" in pregunta_procesada.lower() or "ventas" in pregunta_procesada.lower():
-                                    consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                    respuesta = qa.invoke({"query": consulta})
-                                    resultado = respuesta_base + respuesta.get("result", str(respuesta))
-                                else:
-                                    consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                    respuesta = qa.invoke({"query": consulta})
-                                    resultado_base_response = respuesta.get("result", str(respuesta))
-                                    resultado = respuesta_base + resultado_base_response + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
-                                    actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
-                            elif intencion == "otro_tema":
-                                # Cliente menciona otro tema - GUARDAR CONSULTA
-                                actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
-                                # Guardar la consulta para Vanessa
-                                guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
-                                resultado = respuesta_base + generar_respuesta_otro_tema(idioma_detectado)
-                            else:
-                                # Saludo inicial - preguntar qué necesita
-                                logger.info("Generando saludo inicial de TerraMagna")
-                                actualizar_estado_conversacion(numero_whatsapp, "esperando_categoria")
-                                resultado = respuesta_base + generar_saludo_inicial(idioma_detectado)
-                                logger.info(f"Saludo generado: {resultado[:100]}...")
-                        
-                        # Si estamos esperando que elija categoría
-                        elif estado_conversacion["estado"] == "esperando_categoria":
-                            categoria = detectar_respuesta_categoria(pregunta_procesada)
-                            logger.info(f"Categoría detectada: {categoria} para mensaje: '{pregunta_procesada}'")
-                            
-                            if categoria == "inmobiliario":
-                                logger.info("Procesando como consulta inmobiliaria específica")
-                                actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
-                                # NUEVO: Aplicar lógica diferenciada
-                                if detectar_consulta_propiedad_especifica(pregunta_procesada):
-                                    consulta = crear_prompt_consulta_detallada(pregunta_procesada, idioma_detectado, plataforma)
-                                    respuesta = qa.invoke({"query": consulta})
-                                    resultado = respuesta_base + respuesta.get("result", str(respuesta))
-                                elif "venta" in pregunta_procesada.lower() or "ventas" in pregunta_procesada.lower():
-                                    consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                    respuesta = qa.invoke({"query": consulta})
-                                    resultado = respuesta_base + respuesta.get("result", str(respuesta))
-                                else:
-                                    consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                    respuesta = qa.invoke({"query": consulta})
-                                    resultado_base_response = respuesta.get("result", str(respuesta))
-                                    resultado = respuesta_base + resultado_base_response + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
-                                    actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
-                            elif categoria == "otro_tema":
-                                logger.info("Procesando como asesoramiento personal - derivar a Vanessa")
-                                actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
-                                # Guardar la consulta para Vanessa
-                                guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
-                                resultado = respuesta_base + generar_respuesta_otro_tema(idioma_detectado)
-                            else:
-                                # Si no está claro, preguntar de nuevo
-                                logger.info("Categoría no clara, repitiendo saludo")
-                                resultado = respuesta_base + generar_saludo_inicial(idioma_detectado)
-                        
-                        # Si ya estamos en modo inmobiliario - MODIFICACIÓN PRINCIPAL
-                        elif estado_conversacion["estado"] == "inmobiliario":
-                            # NUEVO: Detectar si es consulta específica de propiedad
-                            if detectar_consulta_propiedad_especifica(pregunta_procesada):
-                                # Consulta detallada de propiedad específica
-                                consulta = crear_prompt_consulta_detallada(pregunta_procesada, idioma_detectado, plataforma)
-                                respuesta = qa.invoke({"query": consulta})
-                                resultado_base_response = respuesta.get("result", str(respuesta))
-                                resultado = respuesta_base + resultado_base_response
-                                # No cambiar estado para permitir más consultas detalladas
-                            elif "venta" in pregunta_procesada.lower() or "ventas" in pregunta_procesada.lower():
-                                # Consulta general de ventas - NO añadir pregunta de seguimiento
-                                consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                respuesta = qa.invoke({"query": consulta})
-                                resultado_base_response = respuesta.get("result", str(respuesta))
-                                resultado = respuesta_base + resultado_base_response
-                                # No cambiar estado para evitar doble pregunta
-                            else:
-                                # Otras consultas inmobiliarias
-                                consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                respuesta = qa.invoke({"query": consulta})
-                                resultado_base_response = respuesta.get("result", str(respuesta))
-                                resultado = respuesta_base + resultado_base_response + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
-                                actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
-                        
-                        # Si estamos esperando seguimiento después de una respuesta
-                        elif estado_conversacion["estado"] == "esperando_seguimiento":
-                            # Verificar primero si insiste en contacto personal
-                            if detectar_insistencia_contacto_personal(pregunta_procesada):
-                                logger.info("Cliente insiste en contacto con Vanessa - confirmar llamada")
-                                actualizar_estado_conversacion(numero_whatsapp, "confirmando_llamada")
-                                # Guardar la consulta para Vanessa
-                                guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
-                                resultado = respuesta_base + generar_confirmacion_llamada(idioma_detectado)
-                            # Verificar si quiere finalizar o continuar
-                            elif detectar_finalizacion_conversacion(pregunta_procesada):
-                                # Cliente agradece o dice que está bien
-                                if idioma_detectado in ["inglés", "english"]:
-                                    resultado = respuesta_base + "You're welcome! Don't hesitate to contact us if you need anything else. Have a great day!"
-                                elif idioma_detectado in ["alemán", "german", "deutsch"]:
-                                    resultado = respuesta_base + "Gern geschehen! Zögern Sie nicht, uns zu kontaktieren, wenn Sie etwas anderes benötigen. Haben Sie einen schönen Tag!"
-                                else:
-                                    resultado = respuesta_base + "¡De nada! No dudes en contactarnos si necesitas algo más. ¡Que tengas un buen día!"
-                                actualizar_estado_conversacion(numero_whatsapp, "finalizado")
-                            else:
-                                # Detectar nueva categoría
-                                nueva_categoria = detectar_respuesta_categoria(pregunta_procesada)
-                                logger.info(f"Nueva categoría en seguimiento: {nueva_categoria}")
-                                
-                                if nueva_categoria == "inmobiliario":
-                                    actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
-                                    # NUEVO: Aplicar la misma lógica diferenciada
-                                    if detectar_consulta_propiedad_especifica(pregunta_procesada):
-                                        consulta = crear_prompt_consulta_detallada(pregunta_procesada, idioma_detectado, plataforma)
-                                        respuesta = qa.invoke({"query": consulta})
-                                        resultado_base_response = respuesta.get("result", str(respuesta))
-                                        resultado = respuesta_base + resultado_base_response
-                                    elif "venta" in pregunta_procesada.lower() or "ventas" in pregunta_procesada.lower():
-                                        consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                        respuesta = qa.invoke({"query": consulta})
-                                        resultado_base_response = respuesta.get("result", str(respuesta))
-                                        resultado = respuesta_base + resultado_base_response
-                                    else:
-                                        consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                        respuesta = qa.invoke({"query": consulta})
-                                        resultado_base_response = respuesta.get("result", str(respuesta))
-                                        resultado = respuesta_base + resultado_base_response + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
-                                        actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
-                                elif nueva_categoria == "otro_tema":
-                                    logger.info("Cliente vuelve a otro tema - derivar a Vanessa")
-                                    actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
-                                    # Guardar la consulta para Vanessa
-                                    guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
-                                    resultado = respuesta_base + generar_respuesta_otro_tema(idioma_detectado)
-                                else:
-                                    # Si no está claro, preguntar qué necesita
-                                    if idioma_detectado in ["inglés", "english"]:
-                                        resultado = respuesta_base + "What would you like to know more about? Our rental properties, properties for sale, or something else?"
-                                    elif idioma_detectado in ["alemán", "german", "deutsch"]:
-                                        resultado = respuesta_base + "Worüber möchten Sie mehr erfahren? Unsere Mietimmobilien, Verkaufsimmobilien oder etwas anderes?"
-                                    else:
-                                        resultado = respuesta_base + "¿Sobre qué te gustaría saber más? ¿Nuestras propiedades en alquiler, propiedades en venta, o algo más?"
-                        
-                        # Si está confirmando que Vanessa llamará
-                        elif estado_conversacion["estado"] == "confirmando_llamada":
-                            # Verificar si proporciona datos de contacto
-                            if detectar_datos_contacto(pregunta_procesada):
-                                logger.info("Cliente proporcionó datos de contacto - confirmar")
-                                # NUEVO: Actualizar consulta con nombre extraído
-                                nombre_extraido = extraer_nombre_del_texto(pregunta_procesada)
-                                if numero_whatsapp in consultas_vanessa:
-                                    consultas_vanessa[numero_whatsapp]['nombre'] = nombre_extraido
-                                    consultas_vanessa[numero_whatsapp]['mensaje'] += f" | Datos de contacto: {pregunta_procesada}"
-                                
-                                if idioma_detectado in ["inglés", "english"]:
-                                    resultado = respuesta_base + "Perfect! I have noted your contact information. Vanessa will call you as soon as possible."
-                                elif idioma_detectado in ["alemán", "german", "deutsch"]:
-                                    resultado = respuesta_base + "Perfekt! Ich habe Ihre Kontaktdaten notiert. Vanessa wird Sie so schnell wie möglich anrufen."
-                                else:
-                                    resultado = respuesta_base + "¡Perfecto! He anotado tu información de contacto. Vanessa te llamará lo antes posible."
-                                
-                                actualizar_estado_conversacion(numero_whatsapp, "finalizado")
-                            else:
-                                # Si no da información clara, recordar que la necesitamos
-                                logger.info("Cliente no proporcionó datos claros - pedir de nuevo")
-                                resultado = respuesta_base + generar_confirmacion_llamada(idioma_detectado)
-                        
-                        # Si está en otro tema pero puede cambiar de opinión
-                        elif estado_conversacion["estado"] == "otro_tema_finalizado":
-                            # Verificar primero si insiste en que Vanessa le llame
-                            if detectar_insistencia_contacto_personal(pregunta_procesada):
-                                logger.info("Cliente insiste en llamada después de otro tema - confirmar")
-                                actualizar_estado_conversacion(numero_whatsapp, "confirmando_llamada")
-                                resultado = respuesta_base + generar_confirmacion_llamada(idioma_detectado)
-                            else:
-                                # El cliente está explicando más detalles sobre su consulta para Vanessa
-                                logger.info("Cliente continúa explicando su consulta para Vanessa - anotar")
-                                
-                                # NUEVO: Actualizar consulta existente con más detalles
-                                if numero_whatsapp in consultas_vanessa:
-                                    consultas_vanessa[numero_whatsapp]['mensaje'] += f" | Detalles adicionales: {pregunta_procesada}"
-                                else:
-                                    guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
-                                
-                                # Confirmar que se anotó y pedir datos de contacto
-                                resultado = respuesta_base + generar_confirmacion_consulta_anotada(idioma_detectado)
-                                actualizar_estado_conversacion(numero_whatsapp, "confirmando_llamada")
-                        
-                        # Si ya finalizó pero escribe de nuevo
-                        elif estado_conversacion["estado"] == "finalizado":
-                            # Reiniciar conversación
-                            actualizar_estado_conversacion(numero_whatsapp, "inicial")
-                            intencion = detectar_intencion_inicial(pregunta_procesada)
-                            
-                            if intencion == "inmobiliario_directo":
-                                actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
-                                # NUEVO: Aplicar la misma lógica diferenciada
-                                if detectar_consulta_propiedad_especifica(pregunta_procesada):
-                                    consulta = crear_prompt_consulta_detallada(pregunta_procesada, idioma_detectado, plataforma)
-                                    respuesta = qa.invoke({"query": consulta})
-                                    resultado_base_response = respuesta.get("result", str(respuesta))
-                                    resultado = respuesta_base + resultado_base_response
-                                elif "venta" in pregunta_procesada.lower() or "ventas" in pregunta_procesada.lower():
-                                    consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                    respuesta = qa.invoke({"query": consulta})
-                                    resultado_base_response = respuesta.get("result", str(respuesta))
-                                    resultado = respuesta_base + resultado_base_response
-                                else:
-                                    consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
-                                    respuesta = qa.invoke({"query": consulta})
-                                    resultado_base_response = respuesta.get("result", str(respuesta))
-                                    resultado = respuesta_base + resultado_base_response + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
-                                    actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
-                            else:
-                                actualizar_estado_conversacion(numero_whatsapp, "esperando_categoria")
-                                resultado = respuesta_base + generar_saludo_inicial(idioma_detectado)
-                        
-                        else:
-                            # Estado desconocido, reiniciar
-                            actualizar_estado_conversacion(numero_whatsapp, "inicial")
-                            resultado = respuesta_base + generar_saludo_inicial(idioma_detectado)
-                    
+                        # Procesar según el estado actual
+                        resultado = procesar_estado_conversacion(
+                            estado_conversacion, pregunta_procesada, idioma_detectado,
+                            numero_whatsapp, respuesta_base, qa, plataforma
+                        )
                     else:
-                        # Para web, usar lógica normal de consulta inmobiliaria
+                        # Para web, usar lógica normal
                         consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
                         respuesta = qa.invoke({"query": consulta})
                         resultado = respuesta.get("result", str(respuesta))
@@ -1163,12 +900,12 @@ def inicializar_agente():
                     if not pregunta_procesada.strip():
                         return "Mensaje vacío. ¿Podrías escribir tu consulta?"
                     
-                    # NUEVO: Verificar si es comando de resumen
+                    # Verificar si es comando de resumen
                     if plataforma.lower() == "whatsapp" and numero_whatsapp and es_comando_resumen(pregunta_procesada, numero_whatsapp):
-                        logger.info("📋 Comando RESUMEN detectado desde número de inmobiliaria")
+                        logger.info("📋 Comando RESUMEN detectado")
                         return generar_resumen_consultas()
                     
-                    # Detectar idioma con detección de cambios MEJORADA
+                    # Detectar idioma
                     idioma_detectado = detectar_idioma_mejorado(pregunta_procesada, llm, numero_whatsapp)
                     
                     # Lógica simplificada para WhatsApp sin documentos
@@ -1193,7 +930,7 @@ def inicializar_agente():
                                 actualizar_estado_conversacion(numero_whatsapp, "esperando_categoria")
                                 return aplicar_bandera_si_necesario(respuesta_base + generar_saludo_inicial(idioma_detectado), idioma_detectado, numero_whatsapp)
                     
-                    # Usar LLM directamente para consultas inmobiliarias
+                    # Usar LLM directamente
                     consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
                     response = llm.invoke(consulta)
                     resultado_formateado = formatear_respuesta_por_plataforma(response.content, plataforma)
@@ -1217,6 +954,200 @@ def inicializar_agente():
         logger.error(f"❌ No se pudo inicializar el agente: {mensaje_error}")
         agente_executor = lambda pregunta, **kwargs: f"❌ Error del sistema: {mensaje_error}"
         return agente_executor
+
+def procesar_estado_conversacion(estado_conversacion, pregunta_procesada, idioma_detectado, 
+                                 numero_whatsapp, respuesta_base, qa, plataforma):
+    """Procesa la conversación según el estado actual."""
+    
+    estado_actual = estado_conversacion["estado"]
+    
+    if estado_actual == "inicial":
+        return procesar_estado_inicial(pregunta_procesada, idioma_detectado, numero_whatsapp, 
+                                      respuesta_base, qa, plataforma)
+    
+    elif estado_actual == "esperando_categoria":
+        return procesar_esperando_categoria(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                           respuesta_base, qa, plataforma)
+    
+    elif estado_actual == "esperando_seguimiento":
+        return procesar_esperando_seguimiento(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                             respuesta_base, qa, plataforma)
+    
+    elif estado_actual == "inmobiliario":
+        return procesar_estado_inmobiliario(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                           respuesta_base, qa, plataforma)
+    
+    elif estado_actual == "confirmando_llamada":
+        return procesar_confirmando_llamada(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                           respuesta_base)
+    
+    elif estado_actual == "otro_tema_finalizado":
+        return procesar_otro_tema_finalizado(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                            respuesta_base)
+    
+    elif estado_actual == "finalizado":
+        # Reiniciar conversación
+        actualizar_estado_conversacion(numero_whatsapp, "inicial")
+        return procesar_estado_inicial(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                      respuesta_base, qa, plataforma)
+    
+    else:
+        # Estado desconocido, reiniciar
+        actualizar_estado_conversacion(numero_whatsapp, "inicial")
+        return respuesta_base + generar_saludo_inicial(idioma_detectado)
+           # Estado desconocido, reiniciar
+        actualizar_estado_conversacion(numero_whatsapp, "inicial")
+        return respuesta_base + generar_saludo_inicial(idioma_detectado)
+
+def procesar_estado_inicial(pregunta_procesada, idioma_detectado, numero_whatsapp, 
+                           respuesta_base, qa, plataforma):
+    """Procesa el estado inicial de la conversación."""
+    intencion = detectar_intencion_inicial(pregunta_procesada)
+    logger.info(f"Intención detectada: {intencion}")
+    
+    if intencion == "inmobiliario_directo":
+        actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
+        if detectar_consulta_propiedad_especifica(pregunta_procesada):
+            consulta = crear_prompt_consulta_detallada(pregunta_procesada, idioma_detectado, plataforma)
+            respuesta = qa.invoke({"query": consulta})
+            return respuesta_base + respuesta.get("result", str(respuesta))
+        elif "venta" in pregunta_procesada.lower() or "ventas" in pregunta_procesada.lower():
+            consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+            respuesta = qa.invoke({"query": consulta})
+            return respuesta_base + respuesta.get("result", str(respuesta))
+        else:
+            consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+            respuesta = qa.invoke({"query": consulta})
+            resultado_base_response = respuesta.get("result", str(respuesta))
+            return respuesta_base + resultado_base_response + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
+    
+    elif intencion == "otro_tema":
+        actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
+        guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
+        return respuesta_base + generar_respuesta_otro_tema(idioma_detectado)
+    else:
+        actualizar_estado_conversacion(numero_whatsapp, "esperando_categoria")
+        return respuesta_base + generar_saludo_inicial(idioma_detectado)
+
+def procesar_esperando_categoria(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                respuesta_base, qa, plataforma):
+    """Procesa cuando esperamos que el cliente elija categoría."""
+    categoria = detectar_respuesta_categoria(pregunta_procesada)
+    logger.info(f"Categoría detectada: {categoria}")
+    
+    if categoria == "inmobiliario":
+        actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
+        if detectar_consulta_propiedad_especifica(pregunta_procesada):
+            consulta = crear_prompt_consulta_detallada(pregunta_procesada, idioma_detectado, plataforma)
+            respuesta = qa.invoke({"query": consulta})
+            return respuesta_base + respuesta.get("result", str(respuesta))
+        elif "venta" in pregunta_procesada.lower() or "ventas" in pregunta_procesada.lower():
+            consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+            respuesta = qa.invoke({"query": consulta})
+            return respuesta_base + respuesta.get("result", str(respuesta))
+        else:
+            consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+            respuesta = qa.invoke({"query": consulta})
+            resultado_base_response = respuesta.get("result", str(respuesta))
+            actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
+            return respuesta_base + resultado_base_response + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
+    
+    elif categoria == "otro_tema":
+        actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
+        guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
+        return respuesta_base + generar_respuesta_otro_tema(idioma_detectado)
+    else:
+        return respuesta_base + generar_saludo_inicial(idioma_detectado)
+
+def procesar_esperando_seguimiento(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                  respuesta_base, qa, plataforma):
+    """Procesa cuando esperamos seguimiento después de una respuesta."""
+    if detectar_insistencia_contacto_personal(pregunta_procesada):
+        actualizar_estado_conversacion(numero_whatsapp, "confirmando_llamada")
+        guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
+        return respuesta_base + generar_confirmacion_llamada(idioma_detectado)
+    
+    elif detectar_finalizacion_conversacion(pregunta_procesada):
+        actualizar_estado_conversacion(numero_whatsapp, "finalizado")
+        return respuesta_base + generar_despedida_final(idioma_detectado)
+    
+    else:
+        nueva_categoria = detectar_respuesta_categoria(pregunta_procesada)
+        
+        if nueva_categoria == "inmobiliario":
+            actualizar_estado_conversacion(numero_whatsapp, "inmobiliario")
+            return procesar_consulta_inmobiliaria(pregunta_procesada, idioma_detectado, 
+                                                 numero_whatsapp, respuesta_base, qa, plataforma)
+        elif nueva_categoria == "otro_tema":
+            actualizar_estado_conversacion(numero_whatsapp, "otro_tema_finalizado")
+            guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
+            return respuesta_base + generar_respuesta_otro_tema(idioma_detectado)
+        else:
+            if idioma_detectado in ["inglés", "english"]:
+                return respuesta_base + "What would you like to know more about? Our rental properties, properties for sale, or something else?"
+            elif idioma_detectado in ["alemán", "german", "deutsch"]:
+                return respuesta_base + "Worüber möchten Sie mehr erfahren? Unsere Mietimmobilien, Verkaufsimmobilien oder etwas anderes?"
+            else:
+                return respuesta_base + "¿Sobre qué te gustaría saber más? ¿Nuestras propiedades en alquiler, propiedades en venta, o algo más?"
+
+def procesar_estado_inmobiliario(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                respuesta_base, qa, plataforma):
+    """Procesa consultas cuando ya estamos en modo inmobiliario."""
+    return procesar_consulta_inmobiliaria(pregunta_procesada, idioma_detectado,
+                                         numero_whatsapp, respuesta_base, qa, plataforma)
+
+def procesar_consulta_inmobiliaria(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                  respuesta_base, qa, plataforma):
+    """Procesa una consulta inmobiliaria específica."""
+    if detectar_consulta_propiedad_especifica(pregunta_procesada):
+        consulta = crear_prompt_consulta_detallada(pregunta_procesada, idioma_detectado, plataforma)
+        respuesta = qa.invoke({"query": consulta})
+        return respuesta_base + respuesta.get("result", str(respuesta))
+    elif "venta" in pregunta_procesada.lower() or "ventas" in pregunta_procesada.lower():
+        consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+        respuesta = qa.invoke({"query": consulta})
+        return respuesta_base + respuesta.get("result", str(respuesta))
+    else:
+        consulta = crear_prompt_inmobiliario_optimizado(pregunta_procesada, idioma_detectado, plataforma)
+        respuesta = qa.invoke({"query": consulta})
+        resultado_base_response = respuesta.get("result", str(respuesta))
+        actualizar_estado_conversacion(numero_whatsapp, "esperando_seguimiento")
+        return respuesta_base + resultado_base_response + "\n\n" + generar_pregunta_seguimiento(idioma_detectado)
+
+def procesar_confirmando_llamada(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                respuesta_base):
+    """Procesa cuando confirmamos que Vanessa llamará."""
+    if detectar_datos_contacto(pregunta_procesada):
+        nombre_extraido = extraer_nombre_del_texto(pregunta_procesada)
+        if numero_whatsapp in consultas_vanessa:
+            consultas_vanessa[numero_whatsapp]['nombre'] = nombre_extraido
+            consultas_vanessa[numero_whatsapp]['mensaje'] += f" | Datos de contacto: {pregunta_procesada}"
+        
+        actualizar_estado_conversacion(numero_whatsapp, "finalizado")
+        
+        if idioma_detectado in ["inglés", "english"]:
+            return respuesta_base + "Perfect! I have noted your contact information. Vanessa will call you as soon as possible."
+        elif idioma_detectado in ["alemán", "german", "deutsch"]:
+            return respuesta_base + "Perfekt! Ich habe Ihre Kontaktdaten notiert. Vanessa wird Sie so schnell wie möglich anrufen."
+        else:
+            return respuesta_base + "¡Perfecto! He anotado tu información de contacto. Vanessa te llamará lo antes posible."
+    else:
+        return respuesta_base + generar_confirmacion_llamada(idioma_detectado)
+
+def procesar_otro_tema_finalizado(pregunta_procesada, idioma_detectado, numero_whatsapp,
+                                 respuesta_base):
+    """Procesa cuando el cliente continúa después de otro tema."""
+    if detectar_insistencia_contacto_personal(pregunta_procesada):
+        actualizar_estado_conversacion(numero_whatsapp, "confirmando_llamada")
+        return respuesta_base + generar_confirmacion_llamada(idioma_detectado)
+    else:
+        if numero_whatsapp in consultas_vanessa:
+            consultas_vanessa[numero_whatsapp]['mensaje'] += f" | Detalles adicionales: {pregunta_procesada}"
+        else:
+            guardar_consulta_vanessa(numero_whatsapp, pregunta_procesada, idioma_detectado)
+        
+        actualizar_estado_conversacion(numero_whatsapp, "confirmando_llamada")
+        return respuesta_base + generar_confirmacion_consulta_anotada(idioma_detectado)
 
 def ejecutar_agente(pregunta: str):
     """Ejecuta el agente para la plataforma WEB."""
@@ -1260,7 +1191,7 @@ def ejecutar_agente_whatsapp(pregunta: str, numero_whatsapp: str = None):
         logger.error(f"❌ Error ejecutando agente WhatsApp: {e}")
         return "⚠️ Error procesando tu mensaje. Intenta nuevamente."
 
-# NUEVAS FUNCIONES DE UTILIDAD PARA ADMINISTRACIÓN
+# FUNCIONES DE UTILIDAD PARA ADMINISTRACIÓN
 
 def obtener_estadisticas_consultas() -> dict:
     """Obtiene estadísticas de las consultas guardadas para Vanessa."""
@@ -1272,7 +1203,6 @@ def obtener_estadisticas_consultas() -> dict:
             "ultima_consulta": None
         }
     
-    from datetime import date
     hoy = date.today()
     consultas_hoy = 0
     idiomas = {}
@@ -1308,7 +1238,6 @@ def limpiar_consultas_antiguas(dias: int = 30):
     """Limpia consultas más antiguas que X días."""
     global consultas_vanessa
     
-    from datetime import timedelta
     fecha_limite = datetime.now() - timedelta(days=dias)
     
     consultas_a_eliminar = []
@@ -1326,9 +1255,6 @@ def exportar_consultas_csv() -> str:
     """Exporta las consultas a formato CSV."""
     if not consultas_vanessa:
         return "No hay consultas para exportar"
-    
-    import csv
-    import io
     
     output = io.StringIO()
     writer = csv.writer(output)
@@ -1350,11 +1276,35 @@ def exportar_consultas_csv() -> str:
 
 # Test básico
 if __name__ == "__main__":
-    logger.info("🧪 Probando agente...")
-    respuesta = ejecutar_agente("¿Cuál es el precio promedio de una casa en Madrid?")
-    logger.info(f"Respuesta: {respuesta}")
+    logger.info("🧪 Iniciando pruebas del sistema...")
     
-    # Test de resumen
-    logger.info("🧪 Probando función de resumen...")
-    print("Estadísticas:", obtener_estadisticas_consultas())
-    print("Resumen:", generar_resumen_consultas())
+    # Inicializar el agente
+    inicializar_agente()
+    
+    # Prueba básica
+    print("\n" + "="*50)
+    print("PRUEBA 1: Consulta Web en Español")
+    print("="*50)
+    respuesta = ejecutar_agente("¿Cuáles son los precios de las casas en venta?")
+    print(f"Respuesta: {respuesta[:200]}...")
+    
+    # Prueba WhatsApp
+    print("\n" + "="*50)
+    print("PRUEBA 2: Consulta WhatsApp")
+    print("="*50)
+    respuesta_wa = ejecutar_agente_whatsapp("Hola", "+34600000000")
+    print(f"Respuesta WhatsApp: {respuesta_wa}")
+    
+    # Estadísticas
+    print("\n" + "="*50)
+    print("ESTADÍSTICAS DEL SISTEMA")
+    print("="*50)
+    stats = obtener_estadisticas_consultas()
+    print(f"Total consultas: {stats['total_consultas']}")
+    print(f"Consultas hoy: {stats['consultas_hoy']}")
+    print(f"Idiomas detectados: {stats['idiomas']}")
+    
+    print("\n✅ Sistema de IA Inmobiliario funcionando correctamente")
+    print("📚 Recuerda colocar tus documentos en la carpeta 'conocimiento/'")
+    print("🔑 Asegúrate de configurar OPENAI_API_KEY en el archivo .env")# cerebro.py - VERSIÓN CORREGIDA Y FUNCIONAL
+# Sistema de Asistente Virtual Inmobiliario con IA
